@@ -62,13 +62,23 @@ export function useRealtimeTranslation(options) {
         setTranslation('')
         setActivity(a => ({ ...a, assistant: true }))
         break
+      // GA event names (new) + legacy fallback (old beta)
+      case 'response.output_audio_transcript.delta':
       case 'response.audio_transcript.delta':
         currentTranslationRef.current += event.delta || ''
         setTranslation(currentTranslationRef.current)
         break
+      case 'response.output_audio_transcript.done':
       case 'response.audio_transcript.done':
         currentTranslationRef.current = event.transcript || currentTranslationRef.current
         setTranslation(currentTranslationRef.current)
+        break
+      case 'response.output_text.delta':
+      case 'response.text.delta':
+        if (!currentTranslationRef.current.length) {
+          currentTranslationRef.current += event.delta || ''
+          setTranslation(currentTranslationRef.current)
+        }
         break
       case 'response.done':
         setActivity(a => ({ ...a, assistant: false }))
@@ -116,20 +126,23 @@ export function useRealtimeTranslation(options) {
     try {
       await client.connect({ deviceId })
       client.updateSession({
-        modalities: ['audio', 'text'],
-        voice,
+        output_modalities: ['audio'],
+        audio: {
+          input: {
+            transcription: transcribeInput ? { model: 'whisper-1' } : null,
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 600,
+              create_response: true
+            }
+          },
+          output: { voice }
+        },
         instructions: buildTranslationInstructions({
           sourceLang, targetLang, mode: translationMode
-        }),
-        input_audio_transcription: transcribeInput ? { model: 'whisper-1' } : null,
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 600,
-          create_response: true
-        },
-        temperature: 0.6
+        })
       })
     } catch (err) {
       setError(err.message)
@@ -162,15 +175,19 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
-  // Aggiorna istruzioni quando cambiano lingua / voce / modalità durante la sessione
+  // Aggiorna istruzioni / voce / trascrizione mentre la sessione è attiva
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession({
-        voice,
+        audio: {
+          input: {
+            transcription: transcribeInput ? { model: 'whisper-1' } : null
+          },
+          output: { voice }
+        },
         instructions: buildTranslationInstructions({
           sourceLang, targetLang, mode: translationMode
-        }),
-        input_audio_transcription: transcribeInput ? { model: 'whisper-1' } : null
+        })
       })
     }
   }, [sourceLang, targetLang, translationMode, voice, transcribeInput, status])
