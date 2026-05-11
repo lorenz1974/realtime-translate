@@ -1,0 +1,31 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Asset generati automaticamente da `npm run assets`
+# (sorgenti: public/icon.svg e public/og-image.svg)
+public/favicon.svg
+public/favicon.ico
+public/apple-touch-icon-180x180.png
+public/maskable-icon-512x512.png
+public/pwa-64x64.png
+public/pwa-192x192.png
+public/pwa-512x512.png
+public/og-image.png
+
+# Service worker generato da vite-plugin-pwa
+dev-dist
