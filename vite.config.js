@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: false,
+      injectRegister: 'auto',
       includeAssets: [
         'icon.svg',
         'favicon.svg',
@@ -25,7 +25,6 @@ export default defineConfig(({ mode }) => ({
         'og-image.png'
       ],
       manifest: {
-        id: '/?source=pwa',
         name: 'Realtime Translate',
         short_name: 'Translate',
         description: 'Traduzione vocale in tempo reale con OpenAI Realtime API.',
