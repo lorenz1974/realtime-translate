@@ -2,7 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+// GitHub Pages serves from /<repo>/; for local dev keep '/'.
+const GHPAGES_BASE = '/realtime-translate/'
+
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? GHPAGES_BASE : '/',
   plugins: [
     react(),
     VitePWA({
@@ -29,8 +33,8 @@ export default defineConfig({
         background_color: '#eef2ff',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '.',
+        start_url: '.',
         lang: 'it',
         dir: 'ltr',
         categories: ['productivity', 'utilities', 'education'],
@@ -87,4 +91,4 @@ export default defineConfig({
     host: true,
     port: 5173
   }
-})
+}))
