@@ -5,6 +5,7 @@ export default function SettingsPanel({
   open, onClose,
   apiKey, setApiKey,
   model, setModel,
+  transcriptionModel, setTranscriptionModel,
   voice, setVoice,
   deviceId, setDeviceId,
   devices,
@@ -62,11 +63,20 @@ export default function SettingsPanel({
               Resta nel tuo browser (localStorage). Per la produzione usa un backend che generi token effimeri.
             </div>
 
-            <label className="form-label small">Modello</label>
-            <select className="form-select" value={model} onChange={e => setModel(e.target.value)}>
-              <option value="gpt-realtime">gpt-realtime (consigliato)</option>
+            <label className="form-label small">Modello di traduzione</label>
+            <select className="form-select mb-3" value={model} onChange={e => setModel(e.target.value)}>
+              <option value="gpt-realtime-translate">gpt-realtime-translate (specializzato)</option>
+              <option value="gpt-realtime">gpt-realtime (generale)</option>
               <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
               <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+            </select>
+
+            <label className="form-label small">Modello di trascrizione input</label>
+            <select className="form-select" value={transcriptionModel} onChange={e => setTranscriptionModel(e.target.value)}>
+              <option value="gpt-realtime-whisper">gpt-realtime-whisper (consigliato)</option>
+              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+              <option value="whisper-1">whisper-1 (legacy)</option>
             </select>
           </section>
 

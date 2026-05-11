@@ -9,11 +9,13 @@ import SettingsPanel from './components/SettingsPanel.jsx'
 import StatusBadge from './components/StatusBadge.jsx'
 import HistoryList from './components/HistoryList.jsx'
 
-const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || 'gpt-realtime'
+const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || 'gpt-realtime-translate'
+const DEFAULT_TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
 
 export default function App() {
   const [apiKey, setApiKey]           = useState(() => localStorage.getItem('rt_api_key') || '')
   const [model, setModel]             = useState(() => localStorage.getItem('rt_model') || DEFAULT_MODEL)
+  const [transcriptionModel, setTranscriptionModel] = useState(() => localStorage.getItem('rt_tr_model') || DEFAULT_TRANSCRIPTION_MODEL)
   const [voice, setVoice]             = useState(() => localStorage.getItem('rt_voice') || 'alloy')
   const [sourceLang, setSourceLang]   = useState(() => localStorage.getItem('rt_source') || 'it')
   const [targetLang, setTargetLang]   = useState(() => localStorage.getItem('rt_target') || 'en')
@@ -34,7 +36,7 @@ export default function App() {
     sourceTranscript, translation, history, activity,
     connect, disconnect, toggleMute, clearHistory
   } = useRealtimeTranslation({
-    apiKey, model, voice,
+    apiKey, model, transcriptionModel, voice,
     sourceLang: sourceLanguage.native,
     targetLang: targetLanguage.native,
     deviceId, translationMode,
@@ -43,6 +45,7 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },       [apiKey])
   useEffect(() => { localStorage.setItem('rt_model', model) },          [model])
+  useEffect(() => { localStorage.setItem('rt_tr_model', transcriptionModel) }, [transcriptionModel])
   useEffect(() => { localStorage.setItem('rt_voice', voice) },          [voice])
   useEffect(() => { localStorage.setItem('rt_source', sourceLang) },    [sourceLang])
   useEffect(() => { localStorage.setItem('rt_target', targetLang) },    [targetLang])
@@ -216,6 +219,7 @@ export default function App() {
         onClose={() => setShowSettings(false)}
         apiKey={apiKey} setApiKey={setApiKey}
         model={model} setModel={setModel}
+        transcriptionModel={transcriptionModel} setTranscriptionModel={setTranscriptionModel}
         voice={voice} setVoice={setVoice}
         deviceId={deviceId} setDeviceId={setDeviceId}
         devices={devices}

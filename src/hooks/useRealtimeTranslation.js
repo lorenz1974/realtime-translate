@@ -3,7 +3,7 @@ import { RealtimeClient, buildTranslationInstructions } from '../utils/realtimeC
 
 export function useRealtimeTranslation(options) {
   const {
-    apiKey, model, voice,
+    apiKey, model, transcriptionModel, voice,
     sourceLang, targetLang,
     deviceId, translationMode,
     autoPlayAudio, transcribeInput
@@ -129,7 +129,9 @@ export function useRealtimeTranslation(options) {
         output_modalities: ['audio'],
         audio: {
           input: {
-            transcription: transcribeInput ? { model: 'whisper-1' } : null,
+            transcription: transcribeInput
+              ? { model: transcriptionModel || 'gpt-realtime-whisper' }
+              : null,
             turn_detection: {
               type: 'server_vad',
               threshold: 0.5,
@@ -150,7 +152,7 @@ export function useRealtimeTranslation(options) {
       client.disconnect()
       clientRef.current = null
     }
-  }, [apiKey, model, voice, sourceLang, targetLang, deviceId, translationMode, transcribeInput, handleEvent])
+  }, [apiKey, model, transcriptionModel, voice, sourceLang, targetLang, deviceId, translationMode, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -181,7 +183,9 @@ export function useRealtimeTranslation(options) {
       clientRef.current.updateSession({
         audio: {
           input: {
-            transcription: transcribeInput ? { model: 'whisper-1' } : null
+            transcription: transcribeInput
+              ? { model: transcriptionModel || 'gpt-realtime-whisper' }
+              : null
           },
           output: { voice }
         },
@@ -190,7 +194,7 @@ export function useRealtimeTranslation(options) {
         })
       })
     }
-  }, [sourceLang, targetLang, translationMode, voice, transcribeInput, status])
+  }, [sourceLang, targetLang, translationMode, voice, transcriptionModel, transcribeInput, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()
