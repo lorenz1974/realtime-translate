@@ -29,6 +29,43 @@ export const VOICES = [
   { id: 'verse',   name: 'Verse',   description: 'melodica, espressiva' }
 ]
 
+// Preset di reattività (server-side VAD). Più sono bassi i valori,
+// più il modello inizia a tradurre presto e l'esperienza si avvicina
+// all'interpretazione simultanea — a costo di più "falsi turni".
+export const VAD_PRESETS = [
+  {
+    id: 'safe',
+    label: 'Sicuro',
+    icon: 'bi-shield-check',
+    hint: 'Aspetta pause chiare (~700ms). Ideale per frasi lunghe.',
+    threshold: 0.5,
+    prefix_padding_ms: 350,
+    silence_duration_ms: 700
+  },
+  {
+    id: 'balanced',
+    label: 'Bilanciato',
+    icon: 'bi-speedometer2',
+    hint: 'Buon trade-off velocità/precisione (~400ms).',
+    threshold: 0.45,
+    prefix_padding_ms: 250,
+    silence_duration_ms: 400
+  },
+  {
+    id: 'fast',
+    label: 'Reattivo',
+    icon: 'bi-lightning-charge-fill',
+    hint: 'Quasi simultaneo (~200ms). Può tagliare a metà frase.',
+    threshold: 0.4,
+    prefix_padding_ms: 150,
+    silence_duration_ms: 200
+  }
+]
+
+export function getVadPreset(id) {
+  return VAD_PRESETS.find(p => p.id === id) || VAD_PRESETS[1]
+}
+
 export function getLanguage(code) {
   return LANGUAGES.find(l => l.code === code) || LANGUAGES[0]
 }

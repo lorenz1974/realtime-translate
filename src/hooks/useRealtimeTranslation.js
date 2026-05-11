@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RealtimeClient, buildTranslationInstructions } from '../utils/realtimeClient.js'
+import { getVadPreset } from '../utils/languages.js'
+
+function buildTurnDetection(presetId) {
+  const p = getVadPreset(presetId)
+  return {
+    type: 'server_vad',
+    threshold: p.threshold,
+    prefix_padding_ms: p.prefix_padding_ms,
+    silence_duration_ms: p.silence_duration_ms,
+    create_response: true
+  }
+}
 
 export function useRealtimeTranslation(options) {
   const {
     apiKey, model, transcriptionModel, voice,
     sourceLang, targetLang,
-    deviceId, translationMode,
+    deviceId, translationMode, vadPreset,
     autoPlayAudio, transcribeInput
   } = options
 
@@ -62,7 +74,6 @@ export function useRealtimeTranslation(options) {
         setTranslation('')
         setActivity(a => ({ ...a, assistant: true }))
         break
-      // GA event names (new) + legacy fallback (old beta)
       case 'response.output_audio_transcript.delta':
       case 'response.audio_transcript.delta':
         currentTranslationRef.current += event.delta || ''
@@ -132,13 +143,7 @@ export function useRealtimeTranslation(options) {
             transcription: transcribeInput
               ? { model: transcriptionModel || 'gpt-realtime-whisper' }
               : null,
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 600,
-              create_response: true
-            }
+            turn_detection: buildTurnDetection(vadPreset)
           },
           output: { voice }
         },
@@ -152,7 +157,7 @@ export function useRealtimeTranslation(options) {
       client.disconnect()
       clientRef.current = null
     }
-  }, [apiKey, model, transcriptionModel, voice, sourceLang, targetLang, deviceId, translationMode, transcribeInput, handleEvent])
+  }, [apiKey, model, transcriptionModel, voice, sourceLang, targetLang, deviceId, translationMode, vadPreset, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -177,7 +182,7 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
-  // Aggiorna istruzioni / voce / trascrizione mentre la sessione è attiva
+  // Aggiorna istruzioni / voce / trascrizione / VAD mentre la sessione è attiva
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession({
@@ -185,7 +190,8 @@ export function useRealtimeTranslation(options) {
           input: {
             transcription: transcribeInput
               ? { model: transcriptionModel || 'gpt-realtime-whisper' }
-              : null
+              : null,
+            turn_detection: buildTurnDetection(vadPreset)
           },
           output: { voice }
         },
@@ -194,7 +200,7 @@ export function useRealtimeTranslation(options) {
         })
       })
     }
-  }, [sourceLang, targetLang, translationMode, voice, transcriptionModel, transcribeInput, status])
+  }, [sourceLang, targetLang, translationMode, voice, transcriptionModel, transcribeInput, vadPreset, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()

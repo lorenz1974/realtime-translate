@@ -3,6 +3,7 @@ import { LANGUAGES, getLanguage } from './utils/languages.js'
 import { useRealtimeTranslation } from './hooks/useRealtimeTranslation.js'
 import Header from './components/Header.jsx'
 import LanguageSelector from './components/LanguageSelector.jsx'
+import SpeedSelector from './components/SpeedSelector.jsx'
 import MicButton from './components/MicButton.jsx'
 import TranscriptPanel from './components/TranscriptPanel.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
@@ -26,6 +27,7 @@ export default function App() {
   const [autoPlayAudio, setAutoPlayAudio]   = useState(() => localStorage.getItem('rt_autoplay') !== '0')
   const [transcribeInput, setTranscribeInput] = useState(() => localStorage.getItem('rt_transcribe') !== '0')
   const [translationMode, setTranslationMode] = useState(() => localStorage.getItem('rt_mode') || 'natural')
+  const [vadPreset, setVadPreset]             = useState(() => localStorage.getItem('rt_vad') || 'balanced')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
 
   const sourceLanguage = useMemo(() => getLanguage(sourceLang), [sourceLang])
@@ -39,7 +41,7 @@ export default function App() {
     apiKey, model, transcriptionModel, voice,
     sourceLang: sourceLanguage.native,
     targetLang: targetLanguage.native,
-    deviceId, translationMode,
+    deviceId, translationMode, vadPreset,
     autoPlayAudio, transcribeInput
   })
 
@@ -53,6 +55,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('rt_autoplay', autoPlayAudio ? '1' : '0') }, [autoPlayAudio])
   useEffect(() => { localStorage.setItem('rt_transcribe', transcribeInput ? '1' : '0') }, [transcribeInput])
   useEffect(() => { localStorage.setItem('rt_mode', translationMode) }, [translationMode])
+  useEffect(() => { localStorage.setItem('rt_vad', vadPreset) },        [vadPreset])
   useEffect(() => { localStorage.setItem('rt_history', showHistory ? '1' : '0') }, [showHistory])
 
   useEffect(() => {
@@ -121,6 +124,8 @@ export default function App() {
               onTargetChange={setTargetLang}
               onSwap={swapLanguages}
             />
+
+            <SpeedSelector value={vadPreset} onChange={setVadPreset} />
 
             <div className="d-flex justify-content-center my-4">
               <MicButton
