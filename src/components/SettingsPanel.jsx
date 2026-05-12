@@ -93,10 +93,15 @@ export default function SettingsPanel({
 
             <label className="form-label small">Modello di traduzione</label>
             <select className="form-select mb-3" value={model} onChange={e => setModel(e.target.value)}>
-              <option value="gpt-realtime-translate">gpt-realtime-translate (specializzato)</option>
-              <option value="gpt-realtime">gpt-realtime (generale)</option>
-              <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
-              <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+              <optgroup label="Traduzione specializzata (endpoint /v1/realtime/translations)">
+                <option value="gpt-realtime-translate">gpt-realtime-translate — interprete dedicato</option>
+              </optgroup>
+              <optgroup label="Assistenti vocali generici (endpoint /v1/realtime)">
+                <option value="gpt-realtime-2">gpt-realtime-2 — ultima generazione</option>
+                <option value="gpt-realtime">gpt-realtime</option>
+                <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
+                <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+              </optgroup>
             </select>
 
             <label className="form-label small">Modello di trascrizione input</label>
@@ -127,6 +132,10 @@ export default function SettingsPanel({
                 <option key={v.id} value={v.id}>{v.name} — {v.description}</option>
               ))}
             </select>
+            <div className="small text-secondary mt-1">
+              <i className="bi bi-info-circle me-1"></i>
+              La voce si applica solo al modello generico. <code>gpt-realtime-translate</code> ha una voce automatica.
+            </div>
           </section>
 
           <section className="mb-4">
@@ -217,7 +226,7 @@ export default function SettingsPanel({
               </label>
             </div>
 
-            <label className="form-label small">Stile di traduzione</label>
+            <label className="form-label small">Stile di traduzione (solo modelli generici)</label>
             <div className="btn-group w-100" role="group" aria-label="Stile">
               {[
                 { id: 'natural', label: 'Naturale',   icon: 'bi-stars' },
