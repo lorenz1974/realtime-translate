@@ -19,10 +19,7 @@ function Select({ value, onChange, exclude, label, icon }) {
   )
 }
 
-export default function LanguageSelector({
-  source, target, onSourceChange, onTargetChange, onSwap,
-  labelA = 'Da', labelB = 'A'
-}) {
+export default function LanguageSelector({ source, target, onSourceChange, onTargetChange, onSwap }) {
   return (
     <div className="row g-2 align-items-end">
       <div className="col">
@@ -30,7 +27,7 @@ export default function LanguageSelector({
           value={source}
           onChange={onSourceChange}
           exclude={target}
-          label={labelA}
+          label="Da"
           icon="bi-mic-fill"
         />
       </div>
@@ -49,7 +46,7 @@ export default function LanguageSelector({
           value={target}
           onChange={onTargetChange}
           exclude={source}
-          label={labelB}
+          label="A"
           icon="bi-megaphone-fill"
         />
       </div>
