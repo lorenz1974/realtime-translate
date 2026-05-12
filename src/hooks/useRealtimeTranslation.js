@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RealtimeClient } from '../utils/realtimeClient.js'
+import { detectLanguage } from '../utils/languages.js'
 
 const MODEL = 'gpt-realtime-translate'
 const TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
 
-// session.update payload for the OpenAI realtime translation session.
-// Strictly minimal per the docs: only `audio.output.language` and an
-// optional `audio.input.transcription.model`. Anything else (language
-// hint on the transcription, voice, instructions...) is rejected and
-// causes the WHOLE update to be discarded.
 function buildSessionConfig({ targetLangCode, transcribeInput }) {
-  const session = {
-    audio: { output: { language: targetLangCode } }
-  }
+  const session = { audio: { output: { language: targetLangCode } } }
   if (transcribeInput) {
     session.audio.input = { transcription: { model: TRANSCRIPTION_MODEL } }
   }
@@ -20,7 +14,10 @@ function buildSessionConfig({ targetLangCode, transcribeInput }) {
 }
 
 export function useRealtimeTranslation(options) {
-  const { apiKey, targetLangCode, deviceId, transcribeInput } = options
+  const {
+    apiKey, langA, langB, conversationMode,
+    deviceId, transcribeInput
+  } = options
 
   const [status, setStatus] = useState('disconnected')
   const [error, setError] = useState(null)
@@ -30,11 +27,26 @@ export function useRealtimeTranslation(options) {
   const [history, setHistory] = useState([])
   const [activity, setActivity] = useState({ user: false, assistant: false })
 
-  const clientRef = useRef(null)
-  const audioElRef = useRef(null)
-  const currentSourceRef = useRef('')
+  // In conversation mode the current direction can flip. We expose the
+  // "who is speaking" code so the UI can show it as a badge.
+  const [activeSourceCode, setActiveSourceCode] = useState(langA)
+  const [activeTargetCode, setActiveTargetCode] = useState(langB)
+
+  const clientRef         = useRef(null)
+  const audioElRef        = useRef(null)
+  const currentSourceRef  = useRef('')
   const currentTranslationRef = useRef('')
-  const idleTimerRef = useRef(null)
+  const activeSourceRef   = useRef(langA)
+  const activeTargetRef   = useRef(langB)
+  const langARef          = useRef(langA)
+  const langBRef          = useRef(langB)
+  const conversationModeRef = useRef(conversationMode)
+
+  useEffect(() => { langARef.current = langA }, [langA])
+  useEffect(() => { langBRef.current = langB }, [langB])
+  useEffect(() => { conversationModeRef.current = conversationMode }, [conversationMode])
+  useEffect(() => { activeSourceRef.current = activeSourceCode }, [activeSourceCode])
+  useEffect(() => { activeTargetRef.current = activeTargetCode }, [activeTargetCode])
 
   useEffect(() => {
     const el = document.createElement('audio')
@@ -50,6 +62,8 @@ export function useRealtimeTranslation(options) {
     if (currentSourceRef.current || currentTranslationRef.current) {
       const entry = {
         id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        sourceCode: activeSourceRef.current,
+        targetCode: activeTargetRef.current,
         source: currentSourceRef.current,
         translation: currentTranslationRef.current,
         ts: Date.now()
@@ -62,12 +76,20 @@ export function useRealtimeTranslation(options) {
     }
   }, [])
 
-  const scheduleIdleCommit = useCallback(() => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-    idleTimerRef.current = setTimeout(() => {
-      setActivity(a => ({ ...a, assistant: false }))
-      commitToHistory()
-    }, 1800)
+  // Swap direction: commit current transcript to history, flip active
+  // source/target, and tell the model the new output language via
+  // session.update.
+  const swap = useCallback(() => {
+    commitToHistory()
+    const newSource = activeTargetRef.current
+    const newTarget = activeSourceRef.current
+    setActiveSourceCode(newSource)
+    setActiveTargetCode(newTarget)
+    if (clientRef.current) {
+      clientRef.current.updateSession({
+        audio: { output: { language: newTarget } }
+      })
+    }
   }, [commitToHistory])
 
   const handleEvent = useCallback((event) => {
@@ -78,18 +100,40 @@ export function useRealtimeTranslation(options) {
         setActivity(a => ({ ...a, user: true }))
         break
       case 'session.input_transcript.done':
-      case 'session.input_transcript.completed':
+      case 'session.input_transcript.completed': {
         if (event.transcript) {
           currentSourceRef.current = event.transcript
           setSourceTranscript(currentSourceRef.current)
         }
         setActivity(a => ({ ...a, user: false }))
+        // --- Auto-swap in conversation mode ---
+        if (conversationModeRef.current && event.transcript) {
+          const a = langARef.current
+          const b = langBRef.current
+          const detected = detectLanguage(event.transcript, [a, b])
+          if (detected && detected !== activeSourceRef.current) {
+            // Speaker switched. Use 50ms delay so the just-arrived transcript
+            // gets committed to history under the OLD direction first.
+            setTimeout(() => {
+              commitToHistory()
+              const newSource = detected
+              const newTarget = detected === a ? b : a
+              setActiveSourceCode(newSource)
+              setActiveTargetCode(newTarget)
+              if (clientRef.current) {
+                clientRef.current.updateSession({
+                  audio: { output: { language: newTarget } }
+                })
+              }
+            }, 50)
+          }
+        }
         break
+      }
       case 'session.output_transcript.delta':
         currentTranslationRef.current += event.delta || ''
         setTranslation(currentTranslationRef.current)
         setActivity(a => ({ ...a, assistant: true }))
-        scheduleIdleCommit()
         break
       case 'session.output_transcript.done':
       case 'session.output_transcript.completed':
@@ -97,12 +141,8 @@ export function useRealtimeTranslation(options) {
           currentTranslationRef.current = event.transcript
           setTranslation(currentTranslationRef.current)
         }
-        if (idleTimerRef.current) {
-          clearTimeout(idleTimerRef.current)
-          idleTimerRef.current = null
-        }
         setActivity(a => ({ ...a, assistant: false }))
-        commitToHistory()
+        // NB: no commitToHistory here — we keep streaming until a swap.
         break
       case 'error':
         setError(event.error?.message || 'Errore sconosciuto dalla Realtime API')
@@ -110,7 +150,7 @@ export function useRealtimeTranslation(options) {
       default:
         break
     }
-  }, [commitToHistory, scheduleIdleCommit])
+  }, [commitToHistory])
 
   const connect = useCallback(async () => {
     if (!apiKey) {
@@ -118,6 +158,12 @@ export function useRealtimeTranslation(options) {
       return
     }
     setError(null)
+    // Reset active direction to the user's chosen langA -> langB at every connect.
+    setActiveSourceCode(langA)
+    setActiveTargetCode(langB)
+    activeSourceRef.current = langA
+    activeTargetRef.current = langB
+
     const client = new RealtimeClient({
       apiKey,
       model: MODEL,
@@ -135,25 +181,22 @@ export function useRealtimeTranslation(options) {
 
     try {
       await client.connect({ deviceId })
-      client.updateSession(buildSessionConfig({ targetLangCode, transcribeInput }))
+      client.updateSession(buildSessionConfig({
+        targetLangCode: langB, transcribeInput
+      }))
     } catch (err) {
       setError(err.message)
       setStatus('error')
       client.disconnect()
       clientRef.current = null
     }
-  }, [apiKey, targetLangCode, deviceId, transcribeInput, handleEvent])
+  }, [apiKey, langA, langB, deviceId, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
       clientRef.current.disconnect()
       clientRef.current = null
     }
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
-      idleTimerRef.current = null
-    }
-    // Flush whatever was in flight
     commitToHistory()
     setStatus('disconnected')
     setActivity({ user: false, assistant: false })
@@ -169,27 +212,26 @@ export function useRealtimeTranslation(options) {
 
   const clearHistory = useCallback(() => {
     setHistory([])
-    setSourceTranscript('')
-    setTranslation('')
-    currentSourceRef.current = ''
-    currentTranslationRef.current = ''
   }, [])
 
+  // When the user toggles transcription on/off mid-session
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
-      clientRef.current.updateSession(buildSessionConfig({ targetLangCode, transcribeInput }))
+      clientRef.current.updateSession(buildSessionConfig({
+        targetLangCode: activeTargetRef.current,
+        transcribeInput
+      }))
     }
-  }, [targetLangCode, transcribeInput, status])
+  }, [transcribeInput, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
   }, [])
 
-  // audioElement was used by the avatar lip-sync, no longer exposed.
   return {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    connect, disconnect, toggleMute, clearHistory
+    activeSourceCode, activeTargetCode,
+    connect, disconnect, toggleMute, clearHistory, swap
   }
 }

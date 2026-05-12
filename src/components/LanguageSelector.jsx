@@ -19,7 +19,10 @@ function Select({ value, onChange, exclude, label, icon }) {
   )
 }
 
-export default function LanguageSelector({ source, target, onSourceChange, onTargetChange, onSwap }) {
+export default function LanguageSelector({
+  source, target, onSourceChange, onTargetChange, onSwap,
+  labelA = 'Da', labelB = 'A'
+}) {
   return (
     <div className="row g-2 align-items-end">
       <div className="col">
@@ -27,7 +30,7 @@ export default function LanguageSelector({ source, target, onSourceChange, onTar
           value={source}
           onChange={onSourceChange}
           exclude={target}
-          label="Da"
+          label={labelA}
           icon="bi-mic-fill"
         />
       </div>
@@ -35,8 +38,7 @@ export default function LanguageSelector({ source, target, onSourceChange, onTar
         <button
           className="btn btn-swap"
           onClick={onSwap}
-          disabled={source === 'auto'}
-          title={source === 'auto' ? 'Non disponibile in modalità auto' : 'Inverti lingue'}
+          title="Inverti lingue"
           aria-label="Inverti lingue"
         >
           <i className="bi bi-arrow-left-right"></i>
@@ -47,7 +49,7 @@ export default function LanguageSelector({ source, target, onSourceChange, onTar
           value={target}
           onChange={onTargetChange}
           exclude={source}
-          label="A"
+          label={labelB}
           icon="bi-megaphone-fill"
         />
       </div>

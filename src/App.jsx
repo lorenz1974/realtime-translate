@@ -13,8 +13,11 @@ const MODEL = 'gpt-realtime-translate'
 
 export default function App() {
   const [apiKey, setApiKey]           = useState(() => localStorage.getItem('rt_api_key') || '')
-  const [sourceLang, setSourceLang]   = useState(() => localStorage.getItem('rt_source') || 'it')
-  const [targetLang, setTargetLang]   = useState(() => localStorage.getItem('rt_target') || 'en')
+  // Two language slots: A and B. In one-way mode A -> B; in conversation mode
+  // the system auto-swaps based on the detected speaker language.
+  const [langA, setLangA]             = useState(() => localStorage.getItem('rt_lang_a') || 'it')
+  const [langB, setLangB]             = useState(() => localStorage.getItem('rt_lang_b') || 'en')
+  const [conversationMode, setConversationMode] = useState(() => localStorage.getItem('rt_conv') === '1')
   const [deviceId, setDeviceId]       = useState(() => localStorage.getItem('rt_device') || '')
   const [devices, setDevices]         = useState([])
   const [showSettings, setShowSettings] = useState(false)
@@ -23,23 +26,24 @@ export default function App() {
   const [transcribeInput, setTranscribeInput] = useState(() => localStorage.getItem('rt_transcribe') !== '0')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
 
-  const sourceLanguage = useMemo(() => getLanguage(sourceLang), [sourceLang])
-  const targetLanguage = useMemo(() => getLanguage(targetLang), [targetLang])
-
   const {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    connect, disconnect, toggleMute, clearHistory
+    activeSourceCode, activeTargetCode,
+    connect, disconnect, toggleMute, clearHistory, swap
   } = useRealtimeTranslation({
     apiKey,
-    targetLangCode: targetLanguage.code,
-    deviceId,
-    transcribeInput
+    langA, langB, conversationMode,
+    deviceId, transcribeInput
   })
 
+  const activeSourceLanguage = useMemo(() => getLanguage(activeSourceCode), [activeSourceCode])
+  const activeTargetLanguage = useMemo(() => getLanguage(activeTargetCode), [activeTargetCode])
+
   useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },       [apiKey])
-  useEffect(() => { localStorage.setItem('rt_source', sourceLang) },    [sourceLang])
-  useEffect(() => { localStorage.setItem('rt_target', targetLang) },    [targetLang])
+  useEffect(() => { localStorage.setItem('rt_lang_a', langA) },         [langA])
+  useEffect(() => { localStorage.setItem('rt_lang_b', langB) },         [langB])
+  useEffect(() => { localStorage.setItem('rt_conv', conversationMode ? '1' : '0') }, [conversationMode])
   useEffect(() => { localStorage.setItem('rt_device', deviceId) },      [deviceId])
   useEffect(() => { localStorage.setItem('rt_autoplay', autoPlayAudio ? '1' : '0') }, [autoPlayAudio])
   useEffect(() => { localStorage.setItem('rt_transcribe', transcribeInput ? '1' : '0') }, [transcribeInput])
@@ -71,12 +75,6 @@ export default function App() {
     }
   }, [])
 
-  const swapLanguages = () => {
-    if (sourceLang === 'auto') return
-    setSourceLang(targetLang)
-    setTargetLang(sourceLang)
-  }
-
   const isConnected = status === 'connected'
   const isConnecting = status === 'connecting'
 
@@ -96,21 +94,48 @@ export default function App() {
             <span className="gradient-text">Traduzione</span> in tempo reale
           </h1>
           <p className="text-secondary mb-0">
-            Parla nel microfono e ascolta la traduzione mentre parli.
+            {conversationMode
+              ? 'Modalità conversazione: parla in una delle due lingue, il sistema rileva chi parla e traduce nell’altra.'
+              : 'Parla nel microfono e ascolta la traduzione mentre parli.'}
             <br className="d-none d-md-inline" />
-            Motore <code>{MODEL}</code> di OpenAI.
+            Motore <code>{MODEL}</code>.
           </p>
         </section>
 
         <div className="card glass-card border-0 shadow-lg mb-4">
           <div className="card-body p-3 p-md-4">
             <LanguageSelector
-              source={sourceLang}
-              target={targetLang}
-              onSourceChange={setSourceLang}
-              onTargetChange={setTargetLang}
-              onSwap={swapLanguages}
+              source={langA}
+              target={langB}
+              onSourceChange={setLangA}
+              onTargetChange={setLangB}
+              onSwap={() => {
+                if (isConnected) {
+                  swap()
+                } else {
+                  setLangA(langB)
+                  setLangB(langA)
+                }
+              }}
+              labelA={conversationMode ? 'Lingua A' : 'Da'}
+              labelB={conversationMode ? 'Lingua B' : 'A'}
             />
+
+            <div className="conv-toggle mt-3">
+              <div className="form-check form-switch m-0">
+                <input className="form-check-input" type="checkbox" id="opt-conv"
+                  checked={conversationMode} onChange={e => setConversationMode(e.target.checked)} />
+                <label className="form-check-label fw-semibold" htmlFor="opt-conv">
+                  <i className="bi bi-people-fill me-1 text-primary"></i>
+                  Modalità conversazione (auto-detect lingua)
+                </label>
+              </div>
+              <div className="small text-secondary mt-1">
+                {conversationMode
+                  ? 'Il sistema riconosce in quale delle due lingue stai parlando e cambia automaticamente la direzione di traduzione.'
+                  : 'Traduce sempre dalla lingua di sinistra a quella di destra.'}
+              </div>
+            </div>
 
             <div className="d-flex justify-content-center my-4">
               <MicButton
@@ -131,6 +156,12 @@ export default function App() {
                 <span className={`badge rounded-pill ${isMuted ? 'bg-warning text-dark' : 'bg-success-subtle text-success-emphasis'}`}>
                   <i className={`bi ${isMuted ? 'bi-mic-mute-fill' : 'bi-mic-fill'} me-1`}></i>
                   {isMuted ? 'Microfono in pausa' : 'Microfono attivo'}
+                </span>
+              )}
+              {isConnected && (
+                <span className="badge rounded-pill bg-primary-subtle text-primary-emphasis">
+                  <i className="bi bi-arrow-right me-1"></i>
+                  {activeSourceLanguage.flag} {activeSourceLanguage.name} → {activeTargetLanguage.flag} {activeTargetLanguage.name}
                 </span>
               )}
               {isConnected && activity.assistant && (
@@ -169,7 +200,7 @@ export default function App() {
             <TranscriptPanel
               icon="bi-mic"
               variant="from-primary"
-              language={sourceLanguage}
+              language={activeSourceLanguage}
               label="Sorgente"
               text={sourceTranscript}
               speaking={activity.user}
@@ -180,7 +211,7 @@ export default function App() {
             <TranscriptPanel
               icon="bi-translate"
               variant="from-accent"
-              language={targetLanguage}
+              language={activeTargetLanguage}
               label="Traduzione"
               text={translation}
               speaking={activity.assistant}
@@ -192,8 +223,6 @@ export default function App() {
         {showHistory && history.length > 0 && (
           <HistoryList
             items={history}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={targetLanguage}
             onClear={clearHistory}
           />
         )}
