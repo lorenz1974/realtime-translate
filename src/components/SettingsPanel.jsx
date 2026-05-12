@@ -13,7 +13,8 @@ export default function SettingsPanel({
   transcribeInput, setTranscribeInput,
   translationMode, setTranslationMode,
   showHistory, setShowHistory,
-  showAvatar, setShowAvatar
+  showAvatar, setShowAvatar,
+  avatarUrl, setAvatarUrl
 }) {
   const [showKey, setShowKey] = useState(false)
 
@@ -103,6 +104,54 @@ export default function SettingsPanel({
           </section>
 
           <section className="mb-4">
+            <h6 className="section-title"><i className="bi bi-emoji-smile me-1 text-success"></i>Avatar 3D</h6>
+
+            <div className="form-check form-switch mb-3">
+              <input className="form-check-input" type="checkbox" id="opt-avatar"
+                checked={showAvatar} onChange={e => setShowAvatar(e.target.checked)} />
+              <label className="form-check-label" htmlFor="opt-avatar">
+                Mostra avatar 3D parlante
+              </label>
+            </div>
+
+            <label className="form-label small">URL avatar Ready Player Me (.glb)</label>
+            <div className="input-group mb-2">
+              <input
+                type="url"
+                className="form-control"
+                placeholder="https://models.readyplayer.me/….glb"
+                value={avatarUrl}
+                onChange={e => setAvatarUrl(e.target.value)}
+                spellCheck="false"
+              />
+              {avatarUrl && (
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  onClick={() => setAvatarUrl('')}
+                  title="Rimuovi URL e usa cartoon di default"
+                  aria-label="Rimuovi"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              )}
+            </div>
+            <div className="small text-secondary mb-2">
+              <i className="bi bi-info-circle me-1"></i>
+              Lascia vuoto per usare l'avatar cartoon di default. Oppure crea un avatar realistico gratis su <a href="https://readyplayer.me" target="_blank" rel="noopener noreferrer">readyplayer.me</a>, copia l'URL del file <code>.glb</code> e incollalo qui. Il lip-sync usa le blendshape <code>mouthOpen</code>/<code>jawOpen</code>.
+            </div>
+            <a
+              className="btn btn-sm btn-outline-primary w-100"
+              href="https://readyplayer.me/avatar"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <i className="bi bi-person-bounding-box me-1"></i>
+              Crea un avatar Ready Player Me
+            </a>
+          </section>
+
+          <section className="mb-4">
             <h6 className="section-title"><i className="bi bi-sliders me-1 text-info"></i>Opzioni</h6>
 
             <div className="form-check form-switch mb-2">
@@ -118,14 +167,6 @@ export default function SettingsPanel({
                 checked={transcribeInput} onChange={e => setTranscribeInput(e.target.checked)} />
               <label className="form-check-label" htmlFor="opt-transcribe">
                 <i className="bi bi-card-text me-1"></i> Mostra trascrizione sorgente
-              </label>
-            </div>
-
-            <div className="form-check form-switch mb-2">
-              <input className="form-check-input" type="checkbox" id="opt-avatar"
-                checked={showAvatar} onChange={e => setShowAvatar(e.target.checked)} />
-              <label className="form-check-label" htmlFor="opt-avatar">
-                <i className="bi bi-emoji-smile me-1"></i> Mostra avatar 3D parlante
               </label>
             </div>
 
@@ -161,8 +202,8 @@ export default function SettingsPanel({
             <ul className="small text-secondary mb-0 ps-3">
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
-              <li>Avatar Ready Player Me con lip-sync a viseme</li>
-              <li>Selettore di formalità (tu/Lei, formal/informal)</li>
+              <li>Lip-sync per visemi (mappa fonemi su viseme_aa, viseme_O…)</li>
+              <li>Espressioni emotive sull'avatar (sorride, sopracciglia)</li>
               <li>Esportazione MP3/WAV della traduzione</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
               <li>Sottotitoli sincronizzati word-by-word (delta evidenziati)</li>

@@ -10,7 +10,6 @@ import SettingsPanel from './components/SettingsPanel.jsx'
 import StatusBadge from './components/StatusBadge.jsx'
 import HistoryList from './components/HistoryList.jsx'
 
-// Lazy-loaded so the three.js bundle (~150KB gz) is fetched only when needed.
 const Avatar3D = lazy(() => import('./components/Avatar3D.jsx'))
 
 const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || 'gpt-realtime-translate'
@@ -33,6 +32,7 @@ export default function App() {
   const [vadPreset, setVadPreset]             = useState(() => localStorage.getItem('rt_vad') || 'balanced')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
   const [showAvatar, setShowAvatar]           = useState(() => localStorage.getItem('rt_avatar') !== '0')
+  const [avatarUrl, setAvatarUrl]             = useState(() => localStorage.getItem('rt_avatar_url') || '')
 
   const sourceLanguage = useMemo(() => getLanguage(sourceLang), [sourceLang])
   const targetLanguage = useMemo(() => getLanguage(targetLang), [targetLang])
@@ -62,6 +62,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('rt_vad', vadPreset) },        [vadPreset])
   useEffect(() => { localStorage.setItem('rt_history', showHistory ? '1' : '0') }, [showHistory])
   useEffect(() => { localStorage.setItem('rt_avatar', showAvatar ? '1' : '0') }, [showAvatar])
+  useEffect(() => { localStorage.setItem('rt_avatar_url', avatarUrl) }, [avatarUrl])
 
   useEffect(() => {
     let cancelled = false
@@ -138,6 +139,7 @@ export default function App() {
                   <Avatar3D
                     stream={remoteStream}
                     speaking={activity.assistant}
+                    glbUrl={avatarUrl}
                   />
                 </Suspense>
               </div>
@@ -249,6 +251,7 @@ export default function App() {
         translationMode={translationMode} setTranslationMode={setTranslationMode}
         showHistory={showHistory} setShowHistory={setShowHistory}
         showAvatar={showAvatar} setShowAvatar={setShowAvatar}
+        avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
       />
     </div>
   )
