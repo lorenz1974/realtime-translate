@@ -96,7 +96,6 @@ main { position: relative; z-index: 1; }
 }
 .btn-swap:disabled { opacity: .45; cursor: not-allowed; }
 
-/* SPEED SELECTOR */
 .speed-selector {
   background: rgba(99, 102, 241, .04);
   border-radius: 16px;
@@ -132,7 +131,6 @@ main { position: relative; z-index: 1; }
 }
 .btn-speed.active:hover { color: white; }
 
-/* AVATAR 3D */
 .avatar-3d {
   position: relative;
   width: 240px;
@@ -187,7 +185,29 @@ main { position: relative; z-index: 1; }
   50%      { opacity: 1; }
 }
 
-/* MIC */
+.avatar-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.avatar-source-link {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, .06);
+  color: inherit;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.avatar-source-link:hover {
+  background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(236,72,153,.06));
+  border-color: rgba(99, 102, 241, .25);
+  color: inherit;
+  transform: translateY(-1px);
+}
+.avatar-source-link strong { color: var(--accent); }
+
 .mic-controls { display: flex; flex-direction: column; gap: 14px; align-items: center; }
 
 .mic-button {
@@ -274,7 +294,6 @@ main { position: relative; z-index: 1; }
   border-color: #ef4444;
 }
 
-/* TRANSCRIPT */
 .transcript-card {
   background: white;
   border-radius: 20px;
@@ -326,7 +345,6 @@ main { position: relative; z-index: 1; }
   .border-start-md { border-left: 1px solid rgba(15, 23, 42, .08); }
 }
 
-/* SETTINGS DRAWER */
 .settings-backdrop {
   position: fixed; inset: 0;
   background: rgba(15, 23, 42, 0.45);

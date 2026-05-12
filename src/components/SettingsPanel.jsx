@@ -1,6 +1,24 @@
 import { useState } from 'react'
 import { VOICES } from '../utils/languages.js'
 
+const AVATAR_SOURCES = [
+  {
+    name: 'Ready Player Me',
+    url: 'https://readyplayerme.com/',
+    desc: 'Crea un avatar realistico full-body in 1 minuto. Esporta un URL .glb pronto all’uso.'
+  },
+  {
+    name: 'Avaturn',
+    url: 'https://avaturn.me/',
+    desc: 'Avatar da una foto, esporta .glb con blendshapes compatibili ARKit.'
+  },
+  {
+    name: 'Sketchfab',
+    url: 'https://sketchfab.com/search?features=downloadable&type=models&q=arkit+head',
+    desc: 'Cerca modelli gratuiti con “ARKit blendshapes”. Scarica .glb e hostalo su un CDN o nel repo.'
+  }
+]
+
 export default function SettingsPanel({
   open, onClose,
   apiKey, setApiKey,
@@ -114,12 +132,12 @@ export default function SettingsPanel({
               </label>
             </div>
 
-            <label className="form-label small">URL avatar Ready Player Me (.glb)</label>
+            <label className="form-label small">URL di un avatar .glb (opzionale)</label>
             <div className="input-group mb-2">
               <input
                 type="url"
                 className="form-control"
-                placeholder="https://models.readyplayer.me/….glb"
+                placeholder="https://…/avatar.glb"
                 value={avatarUrl}
                 onChange={e => setAvatarUrl(e.target.value)}
                 spellCheck="false"
@@ -129,26 +147,36 @@ export default function SettingsPanel({
                   className="btn btn-outline-secondary"
                   type="button"
                   onClick={() => setAvatarUrl('')}
-                  title="Rimuovi URL e usa cartoon di default"
+                  title="Rimuovi URL e usa l’avatar cartoon di default"
                   aria-label="Rimuovi"
                 >
                   <i className="bi bi-x-lg"></i>
                 </button>
               )}
             </div>
-            <div className="small text-secondary mb-2">
+            <div className="small text-secondary mb-3">
               <i className="bi bi-info-circle me-1"></i>
-              Lascia vuoto per usare l'avatar cartoon di default. Oppure crea un avatar realistico gratis su <a href="https://readyplayer.me" target="_blank" rel="noopener noreferrer">readyplayer.me</a>, copia l'URL del file <code>.glb</code> e incollalo qui. Il lip-sync usa le blendshape <code>mouthOpen</code>/<code>jawOpen</code>.
+              Lascia vuoto per usare l’avatar cartoon di default. Per un avatar realistico incolla qui l’URL di un file <code>.glb</code> con blendshapes ARKit (<code>mouthOpen</code>/<code>jawOpen</code>, <code>eyeBlinkLeft/Right</code>): il lip-sync verrà attivato automaticamente.
             </div>
-            <a
-              className="btn btn-sm btn-outline-primary w-100"
-              href="https://readyplayer.me/avatar"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <i className="bi bi-person-bounding-box me-1"></i>
-              Crea un avatar Ready Player Me
-            </a>
+
+            <div className="avatar-sources">
+              <div className="small fw-semibold mb-2 text-secondary">Sorgenti gratuite di avatar .glb:</div>
+              {AVATAR_SOURCES.map(s => (
+                <a
+                  key={s.url}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="avatar-source-link"
+                >
+                  <div className="d-flex align-items-center gap-2">
+                    <i className="bi bi-box-arrow-up-right"></i>
+                    <strong>{s.name}</strong>
+                  </div>
+                  <div className="small text-secondary mt-1">{s.desc}</div>
+                </a>
+              ))}
+            </div>
           </section>
 
           <section className="mb-4">
@@ -203,7 +231,7 @@ export default function SettingsPanel({
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
               <li>Lip-sync per visemi (mappa fonemi su viseme_aa, viseme_O…)</li>
-              <li>Espressioni emotive sull'avatar (sorride, sopracciglia)</li>
+              <li>Espressioni emotive sull’avatar (sorride, sopracciglia)</li>
               <li>Esportazione MP3/WAV della traduzione</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
               <li>Sottotitoli sincronizzati word-by-word (delta evidenziati)</li>
