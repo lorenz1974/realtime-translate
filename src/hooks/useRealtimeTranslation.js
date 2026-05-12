@@ -13,15 +13,17 @@ function buildTurnDetection(presetId) {
   }
 }
 
-// gpt-realtime-translate is a specialised translation model: instead of a
-// system prompt it takes a target language code. The API rejects
-// `session.output_language` (Unknown parameter) so we place the code under
-// `session.audio.output.language`, consistent with how other audio settings
-// are nested in the GA Realtime schema.
 function isTranslateModel(model) {
   return typeof model === 'string' && /realtime-translate/.test(model)
 }
 
+// Build the session.update payload.
+//
+// For gpt-realtime-translate the official docs show a minimal session:
+//   { model: "gpt-realtime-translate", audio: { output: { language: "es" } } }
+// so we omit `type`, `output_modalities` and `instructions` for that model.
+// For generic gpt-realtime models we keep the full chat-style config with
+// system prompt + turn detection + voice.
 function buildSessionConfig({
   model, voice,
   sourceLangNative, targetLangNative,
@@ -39,9 +41,7 @@ function buildSessionConfig({
 
   if (isTranslateModel(model)) {
     return {
-      type: 'realtime',
       model,
-      output_modalities: ['audio'],
       audio: {
         input:  { transcription, turn_detection },
         output: {

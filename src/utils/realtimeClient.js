@@ -1,8 +1,15 @@
-// OpenAI Realtime API — GA endpoint (since 2025).
-// Migration ref: https://learn.microsoft.com/azure/foundry/openai/how-to/realtime-audio-preview-api-migration-guide
-// Old beta: POST /v1/realtime              (no longer works, returns invalid_beta)
-// GA:       POST /v1/realtime/calls
-const OPENAI_REALTIME_URL = 'https://api.openai.com/v1/realtime/calls'
+// OpenAI Realtime API — GA endpoints (since 2025).
+// Generic chat models:   POST /v1/realtime/calls
+// gpt-realtime-translate: POST /v1/realtime/translations/calls
+// Docs: https://developers.openai.com/api/docs/guides/realtime-translation
+const OPENAI_REALTIME_BASE = 'https://api.openai.com/v1/realtime'
+
+function endpointFor(model) {
+  if (typeof model === 'string' && /realtime-translate/.test(model)) {
+    return `${OPENAI_REALTIME_BASE}/translations/calls`
+  }
+  return `${OPENAI_REALTIME_BASE}/calls`
+}
 
 export class RealtimeClient {
   constructor({ apiKey, model, onEvent, onTrack, onStatus, onError }) {
@@ -59,7 +66,7 @@ export class RealtimeClient {
     const offer = await this.pc.createOffer()
     await this.pc.setLocalDescription(offer)
 
-    const url = `${OPENAI_REALTIME_URL}?model=${encodeURIComponent(this.model)}`
+    const url = `${endpointFor(this.model)}?model=${encodeURIComponent(this.model)}`
     const sdpResponse = await fetch(url, {
       method: 'POST',
       headers: {
@@ -100,11 +107,7 @@ export class RealtimeClient {
   }
 
   updateSession(session) {
-    // GA requires explicit `type` on session.update ("realtime" for speech-to-speech)
-    this.sendEvent({
-      type: 'session.update',
-      session: { type: 'realtime', model: this.model, ...session }
-    })
+    this.sendEvent({ type: 'session.update', session })
   }
 
   setMuted(muted) {
