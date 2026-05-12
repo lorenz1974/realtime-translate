@@ -39,7 +39,8 @@ export default function App() {
 
   const {
     status, error, isMuted,
-    sourceTranscript, translation, history, activity, remoteStream,
+    sourceTranscript, translation, history, activity,
+    audioElement,
     connect, disconnect, toggleMute, clearHistory
   } = useRealtimeTranslation({
     apiKey, model, transcriptionModel, voice,
@@ -137,7 +138,7 @@ export default function App() {
               <div className="d-flex justify-content-center mt-4">
                 <Suspense fallback={<div className="avatar-skeleton" />}>
                   <Avatar3D
-                    stream={remoteStream}
+                    audioElement={audioElement}
                     speaking={activity.assistant}
                     glbUrl={avatarUrl}
                   />

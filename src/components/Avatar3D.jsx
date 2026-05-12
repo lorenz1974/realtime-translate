@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useAudioAmplitude } from '../hooks/useAudioAmplitude.js'
 
 // ----------------- CARTOON FACE (default fallback) ----------------------
-function CartoonFace({ amplitudeRef, speaking }) {
+function CartoonFace({ amplitudeRef }) {
   const headRef       = useRef()
   const mouthRef      = useRef()
   const leftEyeRef    = useRef()
@@ -18,6 +18,7 @@ function CartoonFace({ amplitudeRef, speaking }) {
   useFrame((_, dt) => {
     time.current += dt
     const amp = amplitudeRef?.current || 0
+    const isAudible = amp > 0.005
 
     if (headRef.current) {
       const breath = Math.sin(time.current * 1.4) * 0.015
@@ -26,15 +27,13 @@ function CartoonFace({ amplitudeRef, speaking }) {
       headRef.current.rotation.x = Math.sin(time.current * 0.80) * 0.05
     }
 
-    // Even when no audio arrives, give a tiny idle mouth movement while
-    // "speaking" so the avatar never looks frozen.
-    const idleWiggle = speaking ? Math.abs(Math.sin(time.current * 11)) * 0.25 : 0
-    const targetMouth = speaking
-      ? Math.min(0.2 + amp * 6 + idleWiggle, 1.7)
-      : 0.06
-    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 18, 1)
+    // Bocca pilotata DIRETTAMENTE dall'ampiezza audio: continua a muoversi
+    // per tutta la durata del playback, non solo durante l'emissione RTP.
+    const wiggle = isAudible ? Math.abs(Math.sin(time.current * 13)) * 0.08 : 0
+    const targetMouth = Math.min(amp * 7 + wiggle, 1.7)
+    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 22, 1)
     if (mouthRef.current) {
-      mouthRef.current.scale.y = smoothMouth.current
+      mouthRef.current.scale.y = Math.max(smoothMouth.current, 0.06)
       mouthRef.current.scale.x = 1 - smoothMouth.current * 0.2
     }
 
@@ -104,10 +103,7 @@ function CartoonFace({ amplitudeRef, speaking }) {
 }
 
 // ----------------- GLB AVATAR (Ready Player Me, custom) ------------------
-// Drives the standard `mouthOpen` / `jawOpen` / `viseme_aa` morph targets
-// from the live audio amplitude. Compatible with RPM avatars (which expose
-// ARKit-style blendshapes like mouthOpen, mouthSmile, viseme_*).
-function GLBAvatar({ url, amplitudeRef, speaking }) {
+function GLBAvatar({ url, amplitudeRef }) {
   const [scene, setScene]    = useState(null)
   const morphMeshes          = useRef([])
   const rootRef              = useRef()
@@ -142,16 +138,16 @@ function GLBAvatar({ url, amplitudeRef, speaking }) {
   useFrame((_, dt) => {
     time.current += dt
     const amp = amplitudeRef?.current || 0
+    const isAudible = amp > 0.005
 
     if (rootRef.current) {
       rootRef.current.rotation.y = Math.sin(time.current * 0.5) * 0.10
     }
 
-    const idleWiggle = speaking ? Math.abs(Math.sin(time.current * 11)) * 0.15 : 0
-    const targetMouth = speaking ? Math.min(amp * 5.5 + idleWiggle, 1) : 0
-    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 18, 1)
+    const wiggle = isAudible ? Math.abs(Math.sin(time.current * 13)) * 0.06 : 0
+    const targetMouth = Math.min(amp * 5.5 + wiggle, 1)
+    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 22, 1)
 
-    // Blink timing
     nextBlinkIn.current -= dt
     if (nextBlinkIn.current <= 0) {
       blinkValue.current = 1
@@ -175,14 +171,12 @@ function GLBAvatar({ url, amplitudeRef, speaking }) {
   })
 
   if (!scene) return null
-  // Frame the head: RPM avatars are ~1.8m tall, head around y=1.6,
-  // so we lift the model up so the head sits at the camera target.
   return <primitive ref={rootRef} object={scene} position={[0, -1.55, 0]} />
 }
 
 // ----------------- AVATAR ROOT -----------------------------------------
-export default function Avatar3D({ stream, speaking, glbUrl }) {
-  const amplitudeRef = useAudioAmplitude(stream)
+export default function Avatar3D({ audioElement, speaking, glbUrl }) {
+  const amplitudeRef = useAudioAmplitude(audioElement)
   const useGlb = !!(glbUrl && glbUrl.trim().length > 0)
 
   return (
@@ -201,11 +195,11 @@ export default function Avatar3D({ stream, speaking, glbUrl }) {
         <pointLight position={[-3, 1, -2]} intensity={0.45} color="#a5b4fc" />
         <pointLight position={[2, -2, 3]}  intensity={0.30} color="#f9a8d4" />
         {useGlb ? (
-          <Suspense fallback={<CartoonFace amplitudeRef={amplitudeRef} speaking={speaking} />}>
-            <GLBAvatar url={glbUrl} amplitudeRef={amplitudeRef} speaking={speaking} />
+          <Suspense fallback={<CartoonFace amplitudeRef={amplitudeRef} />}>
+            <GLBAvatar url={glbUrl} amplitudeRef={amplitudeRef} />
           </Suspense>
         ) : (
-          <CartoonFace amplitudeRef={amplitudeRef} speaking={speaking} />
+          <CartoonFace amplitudeRef={amplitudeRef} />
         )}
       </Canvas>
       {speaking && (

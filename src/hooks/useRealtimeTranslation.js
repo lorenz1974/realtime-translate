@@ -29,6 +29,7 @@ export function useRealtimeTranslation(options) {
   const [history, setHistory] = useState([])
   const [activity, setActivity] = useState({ user: false, assistant: false })
   const [remoteStream, setRemoteStream] = useState(null)
+  const [audioElement, setAudioElement] = useState(null)
 
   const clientRef = useRef(null)
   const audioElRef = useRef(null)
@@ -42,6 +43,7 @@ export function useRealtimeTranslation(options) {
     el.style.display = 'none'
     document.body.appendChild(el)
     audioElRef.current = el
+    setAudioElement(el)
     return () => {
       el.srcObject = null
       el.remove()
@@ -186,7 +188,6 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
-  // Aggiorna istruzioni / voce / trascrizione / VAD durante la sessione attiva
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession({
@@ -213,7 +214,7 @@ export function useRealtimeTranslation(options) {
   return {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    remoteStream,
+    remoteStream, audioElement,
     connect, disconnect, toggleMute, clearHistory
   }
 }
