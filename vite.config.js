@@ -1,12 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
+
+const pkg = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
+)
 
 // GitHub Pages serves from /<repo>/; for local dev keep '/'.
 const GHPAGES_BASE = '/realtime-translate/'
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? GHPAGES_BASE : '/',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_BUILD__:   JSON.stringify(new Date().toISOString().slice(0, 10))
+  },
   plugins: [
     react(),
     VitePWA({
@@ -81,13 +90,8 @@ export default defineConfig(({ mode }) => ({
           }
         ]
       },
-      devOptions: {
-        enabled: false
-      }
+      devOptions: { enabled: false }
     })
   ],
-  server: {
-    host: true,
-    port: 5173
-  }
+  server: { host: true, port: 5173 }
 }))

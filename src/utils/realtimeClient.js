@@ -1,24 +1,14 @@
-// OpenAI Realtime API — GA endpoints (since 2025).
-// Generic chat models:   POST /v1/realtime/calls
-// gpt-realtime-translate: POST /v1/realtime/translations/calls
+// OpenAI Realtime API — dedicated translation endpoint.
 // Docs: https://developers.openai.com/api/docs/guides/realtime-translation
-const OPENAI_REALTIME_BASE = 'https://api.openai.com/v1/realtime'
-
-function endpointFor(model) {
-  if (typeof model === 'string' && /realtime-translate/.test(model)) {
-    return `${OPENAI_REALTIME_BASE}/translations/calls`
-  }
-  return `${OPENAI_REALTIME_BASE}/calls`
-}
+const TRANSLATIONS_ENDPOINT = 'https://api.openai.com/v1/realtime/translations/calls'
 
 export class RealtimeClient {
-  constructor({ apiKey, model, onEvent, onTrack, onStatus, onError }) {
+  constructor({ apiKey, model, onEvent, onTrack, onStatus }) {
     this.apiKey = apiKey
     this.model = model
     this.onEvent = onEvent || (() => {})
     this.onTrack = onTrack || (() => {})
     this.onStatus = onStatus || (() => {})
-    this.onError = onError || (() => {})
     this.pc = null
     this.dc = null
     this.localStream = null
@@ -55,8 +45,7 @@ export class RealtimeClient {
     this.dc = this.pc.createDataChannel('oai-events')
     this.dc.onmessage = (e) => {
       try {
-        const event = JSON.parse(e.data)
-        this.onEvent(event)
+        this.onEvent(JSON.parse(e.data))
       } catch (err) {
         console.warn('Bad event from Realtime API', err, e.data)
       }
@@ -66,7 +55,7 @@ export class RealtimeClient {
     const offer = await this.pc.createOffer()
     await this.pc.setLocalDescription(offer)
 
-    const url = `${endpointFor(this.model)}?model=${encodeURIComponent(this.model)}`
+    const url = `${TRANSLATIONS_ENDPOINT}?model=${encodeURIComponent(this.model)}`
     const sdpResponse = await fetch(url, {
       method: 'POST',
       headers: {
@@ -87,7 +76,7 @@ export class RealtimeClient {
     await new Promise((resolve, reject) => {
       if (this.dc.readyState === 'open') return resolve()
       const onOpen = () => { cleanup(); resolve() }
-      const onErr = () => { cleanup(); reject(new Error('Data channel error')) }
+      const onErr  = () => { cleanup(); reject(new Error('Data channel error')) }
       const cleanup = () => {
         this.dc.removeEventListener('open', onOpen)
         this.dc.removeEventListener('error', onErr)
@@ -127,27 +116,4 @@ export class RealtimeClient {
     this.localStream = null
     this.onStatus('disconnected')
   }
-}
-
-export function buildTranslationInstructions({ sourceLang, targetLang, mode }) {
-  let instructions = `You are a professional simultaneous interpreter.
-The user speaks in ${sourceLang}.
-Translate everything the user says into ${targetLang}.
-
-Rules:
-- Output ONLY the translation in ${targetLang}, both in text and spoken audio.
-- Never repeat, paraphrase or quote the source language.
-- Never add commentary, apologies, greetings or explanations.
-- Preserve names, numbers, dates, units of measure and proper nouns exactly.
-- Match the speaker's tone, register and level of formality.
-- Translate sentence-by-sentence as soon as a thought is complete; do not wait for long pauses.
-- If the audio is unclear, translate the most likely intent without asking for clarification.
-- If the user is silent, stay silent.`
-
-  if (mode === 'literal') {
-    instructions += '\n- Prefer a literal, word-for-word translation when grammatically possible.'
-  } else if (mode === 'natural') {
-    instructions += '\n- Prefer an idiomatic, natural-sounding translation over a literal one.'
-  }
-  return instructions
 }

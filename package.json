@@ -1,7 +1,7 @@
 {
   "name": "realtime-translate",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Realtime translation PWA using the OpenAI Realtime API.",
   "scripts": {

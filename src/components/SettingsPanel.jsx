@@ -75,7 +75,7 @@ export default function SettingsPanel({
             </select>
           </section>
 
-          <section className="mb-4">
+          <section>
             <h6 className="section-title"><i className="bi bi-sliders me-1 text-info"></i>Opzioni</h6>
 
             <div className="form-check form-switch mb-2">
@@ -101,17 +101,6 @@ export default function SettingsPanel({
                 <i className="bi bi-clock-history me-1"></i> Mantieni cronologia frasi
               </label>
             </div>
-          </section>
-
-          <section>
-            <h6 className="section-title"><i className="bi bi-lightbulb me-1 text-warning"></i>Idee da implementare</h6>
-            <ul className="small text-secondary mb-0 ps-3">
-              <li>Backend Node/Express per token effimeri (production-ready)</li>
-              <li>Modalità conversazione bidirezionale (due voci alternate)</li>
-              <li>Esportazione MP3/WAV della traduzione</li>
-              <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
-              <li>Sottotitoli sincronizzati word-by-word</li>
-            </ul>
           </section>
         </div>
       </aside>

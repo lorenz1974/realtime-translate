@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getLanguage } from './utils/languages.js'
+import { LANGUAGES, getLanguage } from './utils/languages.js'
 import { useRealtimeTranslation } from './hooks/useRealtimeTranslation.js'
 import Header from './components/Header.jsx'
 import LanguageSelector from './components/LanguageSelector.jsx'
@@ -10,16 +10,21 @@ import StatusBadge from './components/StatusBadge.jsx'
 import HistoryList from './components/HistoryList.jsx'
 
 const MODEL = 'gpt-realtime-translate'
+const VALID_CODES = new Set(LANGUAGES.map(l => l.code))
+
+function validCode(code, fallback) {
+  return VALID_CODES.has(code) ? code : fallback
+}
 
 export default function App() {
   const [apiKey, setApiKey]           = useState(() => localStorage.getItem('rt_api_key') || '')
-  const [sourceLang, setSourceLang]   = useState(() => localStorage.getItem('rt_source') || 'it')
-  const [targetLang, setTargetLang]   = useState(() => localStorage.getItem('rt_target') || 'en')
+  const [sourceLang, setSourceLang]   = useState(() => validCode(localStorage.getItem('rt_source'), 'it'))
+  const [targetLang, setTargetLang]   = useState(() => validCode(localStorage.getItem('rt_target'), 'en'))
   const [deviceId, setDeviceId]       = useState(() => localStorage.getItem('rt_device') || '')
   const [devices, setDevices]         = useState([])
   const [showSettings, setShowSettings] = useState(false)
 
-  const [autoPlayAudio, setAutoPlayAudio]   = useState(() => localStorage.getItem('rt_autoplay') !== '0')
+  const [autoPlayAudio, setAutoPlayAudio]     = useState(() => localStorage.getItem('rt_autoplay') !== '0')
   const [transcribeInput, setTranscribeInput] = useState(() => localStorage.getItem('rt_transcribe') !== '0')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
 
@@ -37,10 +42,10 @@ export default function App() {
     deviceId, transcribeInput
   })
 
-  useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },       [apiKey])
-  useEffect(() => { localStorage.setItem('rt_source', sourceLang) },    [sourceLang])
-  useEffect(() => { localStorage.setItem('rt_target', targetLang) },    [targetLang])
-  useEffect(() => { localStorage.setItem('rt_device', deviceId) },      [deviceId])
+  useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },    [apiKey])
+  useEffect(() => { localStorage.setItem('rt_source', sourceLang) }, [sourceLang])
+  useEffect(() => { localStorage.setItem('rt_target', targetLang) }, [targetLang])
+  useEffect(() => { localStorage.setItem('rt_device', deviceId) },   [deviceId])
   useEffect(() => { localStorage.setItem('rt_autoplay', autoPlayAudio ? '1' : '0') }, [autoPlayAudio])
   useEffect(() => { localStorage.setItem('rt_transcribe', transcribeInput ? '1' : '0') }, [transcribeInput])
   useEffect(() => { localStorage.setItem('rt_history', showHistory ? '1' : '0') }, [showHistory])
@@ -71,18 +76,16 @@ export default function App() {
     }
   }, [])
 
+  const isConnected  = status === 'connected'
+  const isConnecting = status === 'connecting'
+
   const swapLanguages = () => {
     const newSource = targetLang
     const newTarget = sourceLang
     setSourceLang(newSource)
     setTargetLang(newTarget)
-    if (isConnected) {
-      applyDirection(newSource, newTarget)
-    }
+    if (isConnected) applyDirection(newSource, newTarget)
   }
-
-  const isConnected = status === 'connected'
-  const isConnecting = status === 'connecting'
 
   return (
     <div className="app-shell">
@@ -102,7 +105,7 @@ export default function App() {
           <p className="text-secondary mb-0">
             Parla nel microfono e ascolta la traduzione mentre parli.
             <br className="d-none d-md-inline" />
-            Per conversare in due, inverti le lingue con il pulsante <i className="bi bi-arrow-left-right"></i> quando è il turno dell’altra persona.
+            Per conversare in due, inverti le lingue con il pulsante <i className="bi bi-arrow-left-right"></i> al cambio turno.
             <br className="d-none d-md-inline" />
             Motore <code>{MODEL}</code>.
           </p>
@@ -202,15 +205,20 @@ export default function App() {
         </div>
 
         {showHistory && history.length > 0 && (
-          <HistoryList
-            items={history}
-            onClear={clearHistory}
-          />
+          <HistoryList items={history} onClear={clearHistory} />
         )}
 
-        <footer className="text-center mt-5 mb-3 text-secondary small">
-          <i className="bi bi-stars me-1"></i>
-          Powered by OpenAI Realtime Translation · Bootstrap 5 · React
+        <footer className="app-footer text-center mt-5 mb-3 small">
+          <div className="fw-semibold">
+            © {new Date().getFullYear()} Lorenzo Lione
+          </div>
+          <div className="text-secondary mt-1">
+            <span className="version-pill">v{__APP_VERSION__}</span>
+            <span className="mx-2">·</span>
+            <span>build {__APP_BUILD__}</span>
+            <span className="mx-2">·</span>
+            <span><i className="bi bi-stars me-1"></i>OpenAI Realtime · React · Bootstrap</span>
+          </div>
         </footer>
       </main>
 
