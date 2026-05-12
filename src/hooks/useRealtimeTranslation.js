@@ -13,9 +13,6 @@ function buildSessionConfig({ targetLangCode, transcribeInput }) {
   return session
 }
 
-// Word-overlap similarity in [0..1]. Used to spot the case where the
-// model is "echoing" the source (i.e. the user is speaking in the
-// current target language, so the translation = the input).
 function similarity(a, b) {
   if (!a || !b) return 0
   const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').trim()
@@ -44,6 +41,10 @@ export function useRealtimeTranslation(options) {
 
   const [activeSourceCode, setActiveSourceCode] = useState(langA)
   const [activeTargetCode, setActiveTargetCode] = useState(langB)
+  // In conversation mode, becomes true after the first successful detect.
+  // While false the UI can show "Auto-detecting..." and the cooldown is
+  // skipped so the very first swap is instant.
+  const [directionLocked, setDirectionLocked] = useState(!conversationMode)
 
   const clientRef         = useRef(null)
   const audioElRef        = useRef(null)
@@ -54,14 +55,26 @@ export function useRealtimeTranslation(options) {
   const langARef          = useRef(langA)
   const langBRef          = useRef(langB)
   const conversationModeRef = useRef(conversationMode)
+  const directionLockedRef  = useRef(!conversationMode)
   const lastDetectAtRef     = useRef(0)
   const swapCooldownRef     = useRef(0)
 
   useEffect(() => { langARef.current = langA }, [langA])
   useEffect(() => { langBRef.current = langB }, [langB])
-  useEffect(() => { conversationModeRef.current = conversationMode }, [conversationMode])
+  useEffect(() => {
+    conversationModeRef.current = conversationMode
+    // Toggling the mode resets the lock so the next sentence does a fresh detect.
+    if (conversationMode) {
+      directionLockedRef.current = false
+      setDirectionLocked(false)
+    } else {
+      directionLockedRef.current = true
+      setDirectionLocked(true)
+    }
+  }, [conversationMode])
   useEffect(() => { activeSourceRef.current = activeSourceCode }, [activeSourceCode])
   useEffect(() => { activeTargetRef.current = activeTargetCode }, [activeTargetCode])
+  useEffect(() => { directionLockedRef.current = directionLocked }, [directionLocked])
 
   useEffect(() => {
     const el = document.createElement('audio')
@@ -91,18 +104,27 @@ export function useRealtimeTranslation(options) {
     }
   }, [])
 
-  // Performs the actual direction flip: commit current transcript to
-  // history, swap activeSource/activeTarget, send session.update to flip
-  // the model's output language, and reset detect bookkeeping.
-  const flipDirection = useCallback((newSource, newTarget) => {
-    if (Date.now() < swapCooldownRef.current) return false
-    swapCooldownRef.current = Date.now() + 1500 // avoid swap-flap
-    commitToHistory()
+  const flipDirection = useCallback((newSource, newTarget, opts = {}) => {
+    const skipCooldown = opts.skipCooldown || !directionLockedRef.current
+    if (!skipCooldown && Date.now() < swapCooldownRef.current) return false
+    swapCooldownRef.current = Date.now() + 1500
+    // On the very first detect we don't want a fake history entry made of
+    // a half-echo of the new speaker's first words — discard it instead.
+    if (!directionLockedRef.current) {
+      currentSourceRef.current = ''
+      currentTranslationRef.current = ''
+      setSourceTranscript('')
+      setTranslation('')
+    } else {
+      commitToHistory()
+    }
     setActiveSourceCode(newSource)
     setActiveTargetCode(newTarget)
     activeSourceRef.current = newSource
     activeTargetRef.current = newTarget
     lastDetectAtRef.current = 0
+    setDirectionLocked(true)
+    directionLockedRef.current = true
     if (clientRef.current) {
       clientRef.current.updateSession({
         audio: { output: { language: newTarget } }
@@ -112,29 +134,25 @@ export function useRealtimeTranslation(options) {
   }, [commitToHistory])
 
   const swap = useCallback(() => {
-    flipDirection(activeTargetRef.current, activeSourceRef.current)
+    flipDirection(activeTargetRef.current, activeSourceRef.current, { skipCooldown: true })
   }, [flipDirection])
 
-  // Heuristic: if conversation mode is on and the detected source
-  // language is not the one we're currently translating FROM, flip.
   const maybeAutoSwapByText = useCallback((text) => {
     if (!conversationModeRef.current) return
-    if (!text || text.length < 6) return
-    // Throttle: don't run detect on every character
-    if (text.length - lastDetectAtRef.current < 4) return
+    if (!text) return
+    const minLen = directionLockedRef.current ? 6 : 4
+    if (text.length < minLen) return
+    if (text.length - lastDetectAtRef.current < 3) return
     lastDetectAtRef.current = text.length
     const a = langARef.current
     const b = langBRef.current
     const detected = detectLanguage(text, [a, b])
-    if (detected && detected !== activeSourceRef.current) {
-      const newTarget = detected === a ? b : a
-      flipDirection(detected, newTarget)
-    }
+    if (!detected) return
+    if (directionLockedRef.current && detected === activeSourceRef.current) return
+    const newTarget = detected === a ? b : a
+    flipDirection(detected, newTarget)
   }, [flipDirection])
 
-  // Fallback: when the model's output is essentially the same as the
-  // input, it means the user is already speaking in the current target
-  // language - flip the direction.
   const maybeAutoSwapByEcho = useCallback(() => {
     if (!conversationModeRef.current) return
     const src = currentSourceRef.current
@@ -162,7 +180,6 @@ export function useRealtimeTranslation(options) {
           setSourceTranscript(currentSourceRef.current)
         }
         setActivity(a => ({ ...a, user: false }))
-        // Final check on the full transcript
         maybeAutoSwapByText(currentSourceRef.current)
         break
       }
@@ -170,7 +187,6 @@ export function useRealtimeTranslation(options) {
         currentTranslationRef.current += event.delta || ''
         setTranslation(currentTranslationRef.current)
         setActivity(a => ({ ...a, assistant: true }))
-        // Periodic echo check while output streams in
         if (currentTranslationRef.current.length > 8 &&
             currentTranslationRef.current.length % 16 < 4) {
           maybeAutoSwapByEcho()
@@ -183,7 +199,6 @@ export function useRealtimeTranslation(options) {
           setTranslation(currentTranslationRef.current)
         }
         setActivity(a => ({ ...a, assistant: false }))
-        // Final echo check
         maybeAutoSwapByEcho()
         break
       case 'error':
@@ -206,6 +221,11 @@ export function useRealtimeTranslation(options) {
     activeTargetRef.current = langB
     lastDetectAtRef.current = 0
     swapCooldownRef.current = 0
+    // In conversation mode the first incoming sentence determines the
+    // direction. Until then, keep the lock OFF.
+    const initialLocked = !conversationMode
+    setDirectionLocked(initialLocked)
+    directionLockedRef.current = initialLocked
 
     const client = new RealtimeClient({
       apiKey,
@@ -233,7 +253,7 @@ export function useRealtimeTranslation(options) {
       client.disconnect()
       clientRef.current = null
     }
-  }, [apiKey, langA, langB, deviceId, transcribeInput, handleEvent])
+  }, [apiKey, langA, langB, conversationMode, deviceId, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -273,7 +293,7 @@ export function useRealtimeTranslation(options) {
   return {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    activeSourceCode, activeTargetCode,
+    activeSourceCode, activeTargetCode, directionLocked,
     connect, disconnect, toggleMute, clearHistory, swap
   }
 }
