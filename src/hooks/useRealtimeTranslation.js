@@ -6,7 +6,13 @@ const TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
 
 // session.update payload for the OpenAI realtime translation session.
 // See https://developers.openai.com/api/docs/guides/realtime-translation
-function buildSessionConfig({ targetLangCode, sourceLangCode, transcribeInput }) {
+//
+// The translation transcription block accepts ONLY { model }; passing a
+// `language` hint there is rejected with "Unknown parameter". When the API
+// rejects the session.update the WHOLE payload is dropped, including
+// `audio.output.language`, and the model falls back to its default target
+// (Spanish). So we keep the payload strictly minimal.
+function buildSessionConfig({ targetLangCode, transcribeInput }) {
   const session = {
     audio: {
       output: { language: targetLangCode }
@@ -14,10 +20,7 @@ function buildSessionConfig({ targetLangCode, sourceLangCode, transcribeInput })
   }
   if (transcribeInput) {
     session.audio.input = {
-      transcription: {
-        model: TRANSCRIPTION_MODEL,
-        ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
-      }
+      transcription: { model: TRANSCRIPTION_MODEL }
     }
   }
   return session
@@ -26,7 +29,7 @@ function buildSessionConfig({ targetLangCode, sourceLangCode, transcribeInput })
 export function useRealtimeTranslation(options) {
   const {
     apiKey,
-    sourceLangCode, targetLangCode,
+    targetLangCode,
     deviceId, transcribeInput
   } = options
 
@@ -139,7 +142,7 @@ export function useRealtimeTranslation(options) {
     try {
       await client.connect({ deviceId })
       client.updateSession(buildSessionConfig({
-        sourceLangCode, targetLangCode, transcribeInput
+        targetLangCode, transcribeInput
       }))
     } catch (err) {
       setError(err.message)
@@ -148,7 +151,7 @@ export function useRealtimeTranslation(options) {
       clientRef.current = null
       setRemoteStream(null)
     }
-  }, [apiKey, sourceLangCode, targetLangCode, deviceId, transcribeInput, handleEvent])
+  }, [apiKey, targetLangCode, deviceId, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -182,10 +185,10 @@ export function useRealtimeTranslation(options) {
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession(buildSessionConfig({
-        sourceLangCode, targetLangCode, transcribeInput
+        targetLangCode, transcribeInput
       }))
     }
-  }, [sourceLangCode, targetLangCode, transcribeInput, status])
+  }, [targetLangCode, transcribeInput, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()
