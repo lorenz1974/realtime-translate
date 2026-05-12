@@ -17,13 +17,11 @@ function isTranslateModel(model) {
   return typeof model === 'string' && /realtime-translate/.test(model)
 }
 
-// Build the session.update payload.
-//
-// For gpt-realtime-translate the official docs show a minimal session:
-//   { model: "gpt-realtime-translate", audio: { output: { language: "es" } } }
-// so we omit `type`, `output_modalities` and `instructions` for that model.
-// For generic gpt-realtime models we keep the full chat-style config with
-// system prompt + turn detection + voice.
+// Translate sessions (gpt-realtime-translate) use a different shape than
+// chat-style realtime sessions: no `type`, no `model` (it's already in the
+// URL/client_secret), no turn detection, no response lifecycle. The session
+// is a continuous stream of input audio -> output audio + transcript deltas.
+// Docs: https://developers.openai.com/api/docs/guides/realtime-translation
 function buildSessionConfig({
   model, voice,
   sourceLangNative, targetLangNative,
@@ -31,6 +29,24 @@ function buildSessionConfig({
   transcribeInput, transcriptionModel,
   translationMode, vadPreset
 }) {
+  if (isTranslateModel(model)) {
+    const session = {
+      audio: {
+        output: { language: targetLangCode }
+      }
+    }
+    if (transcribeInput) {
+      session.audio.input = {
+        transcription: {
+          model: transcriptionModel || 'gpt-realtime-whisper',
+          ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
+        }
+      }
+    }
+    return session
+  }
+
+  // Generic gpt-realtime / preview models: keep the chat-style config.
   const turn_detection = buildTurnDetection(vadPreset)
   const transcription = transcribeInput
     ? {
@@ -38,19 +54,6 @@ function buildSessionConfig({
         ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
       }
     : null
-
-  if (isTranslateModel(model)) {
-    return {
-      model,
-      audio: {
-        input:  { transcription, turn_detection },
-        output: {
-          voice,
-          language: targetLangCode
-        }
-      }
-    }
-  }
 
   return {
     type: 'realtime',
@@ -91,6 +94,7 @@ export function useRealtimeTranslation(options) {
   const audioElRef = useRef(null)
   const currentSourceRef = useRef('')
   const currentTranslationRef = useRef('')
+  const speakingTimerRef = useRef(null)
 
   useEffect(() => {
     const el = document.createElement('audio')
@@ -110,8 +114,56 @@ export function useRealtimeTranslation(options) {
     if (audioElRef.current) audioElRef.current.muted = !autoPlayAudio
   }, [autoPlayAudio])
 
+  const commitToHistory = useCallback(() => {
+    if (currentSourceRef.current || currentTranslationRef.current) {
+      setHistory(h => [
+        {
+          id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+          source: currentSourceRef.current,
+          translation: currentTranslationRef.current,
+          ts: Date.now()
+        },
+        ...h
+      ].slice(0, 50))
+      currentSourceRef.current = ''
+      currentTranslationRef.current = ''
+    }
+  }, [])
+
   const handleEvent = useCallback((event) => {
     switch (event.type) {
+      // ---------- Translation session events (gpt-realtime-translate) ----------
+      case 'session.input_transcript.delta':
+        currentSourceRef.current += event.delta || ''
+        setSourceTranscript(currentSourceRef.current)
+        setActivity(a => ({ ...a, user: true }))
+        break
+      case 'session.input_transcript.done':
+      case 'session.input_transcript.completed':
+        if (event.transcript) currentSourceRef.current = event.transcript
+        setSourceTranscript(currentSourceRef.current)
+        setActivity(a => ({ ...a, user: false }))
+        break
+      case 'session.output_transcript.delta':
+        currentTranslationRef.current += event.delta || ''
+        setTranslation(currentTranslationRef.current)
+        setActivity(a => ({ ...a, assistant: true }))
+        if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+        speakingTimerRef.current = setTimeout(() => {
+          setActivity(a => ({ ...a, assistant: false }))
+          commitToHistory()
+          setSourceTranscript('')
+          setTranslation('')
+        }, 1800)
+        break
+      case 'session.output_transcript.done':
+      case 'session.output_transcript.completed':
+        if (event.transcript) currentTranslationRef.current = event.transcript
+        setTranslation(currentTranslationRef.current)
+        // history commit happens via the idle timer above
+        break
+
+      // ---------- Voice-agent session events (gpt-realtime) ----------
       case 'input_audio_buffer.speech_started':
         currentSourceRef.current = ''
         setSourceTranscript('')
@@ -152,25 +204,16 @@ export function useRealtimeTranslation(options) {
         break
       case 'response.done':
         setActivity(a => ({ ...a, assistant: false }))
-        if (currentSourceRef.current || currentTranslationRef.current) {
-          setHistory(h => [
-            {
-              id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-              source: currentSourceRef.current,
-              translation: currentTranslationRef.current,
-              ts: Date.now()
-            },
-            ...h
-          ].slice(0, 50))
-        }
+        commitToHistory()
         break
+
       case 'error':
         setError(event.error?.message || 'Errore sconosciuto dalla Realtime API')
         break
       default:
         break
     }
-  }, [])
+  }, [commitToHistory])
 
   const connect = useCallback(async () => {
     if (!apiKey) {
@@ -217,6 +260,10 @@ export function useRealtimeTranslation(options) {
       clientRef.current.disconnect()
       clientRef.current = null
     }
+    if (speakingTimerRef.current) {
+      clearTimeout(speakingTimerRef.current)
+      speakingTimerRef.current = null
+    }
     setStatus('disconnected')
     setActivity({ user: false, assistant: false })
     setRemoteStream(null)
@@ -250,6 +297,7 @@ export function useRealtimeTranslation(options) {
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
   }, [])
 
   return {
