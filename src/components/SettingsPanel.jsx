@@ -1,9 +1,5 @@
 import { useState } from 'react'
-import { VOICES } from '../utils/languages.js'
 
-// Sorgenti di avatar .glb verificate. Ready Player Me è stato dismesso,
-// quindi qui elenchiamo solo piattaforme ancora attive o repository
-// pubblici di modelli scaricabili.
 const AVATAR_SOURCES = [
   {
     name: 'Avaturn',
@@ -30,14 +26,10 @@ const AVATAR_SOURCES = [
 export default function SettingsPanel({
   open, onClose,
   apiKey, setApiKey,
-  model, setModel,
-  transcriptionModel, setTranscriptionModel,
-  voice, setVoice,
   deviceId, setDeviceId,
   devices,
   autoPlayAudio, setAutoPlayAudio,
   transcribeInput, setTranscribeInput,
-  translationMode, setTranslationMode,
   showHistory, setShowHistory,
   showAvatar, setShowAvatar,
   avatarUrl, setAvatarUrl
@@ -86,38 +78,19 @@ export default function SettingsPanel({
                 <i className={`bi ${showKey ? 'bi-eye-slash' : 'bi-eye'}`}></i>
               </button>
             </div>
-            <div className="small text-secondary mb-3">
+            <div className="small text-secondary mb-2">
               <i className="bi bi-shield-lock me-1"></i>
               Resta nel tuo browser (localStorage). Per la produzione usa un backend che generi token effimeri.
             </div>
-
-            <label className="form-label small">Modello di traduzione</label>
-            <select className="form-select mb-3" value={model} onChange={e => setModel(e.target.value)}>
-              <optgroup label="Traduzione specializzata (endpoint /v1/realtime/translations)">
-                <option value="gpt-realtime-translate">gpt-realtime-translate — interprete dedicato</option>
-              </optgroup>
-              <optgroup label="Assistenti vocali generici (endpoint /v1/realtime)">
-                <option value="gpt-realtime-2">gpt-realtime-2 — ultima generazione</option>
-                <option value="gpt-realtime">gpt-realtime</option>
-                <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
-                <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
-              </optgroup>
-            </select>
-
-            <label className="form-label small">Modello di trascrizione input</label>
-            <select className="form-select" value={transcriptionModel} onChange={e => setTranscriptionModel(e.target.value)}>
-              <option value="gpt-realtime-whisper">gpt-realtime-whisper (consigliato)</option>
-              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
-              <option value="whisper-1">whisper-1 (legacy)</option>
-            </select>
+            <div className="small text-secondary">
+              <i className="bi bi-cpu me-1"></i>
+              Motore: <code>gpt-realtime-translate</code> · trascrizione: <code>gpt-realtime-whisper</code>.
+            </div>
           </section>
 
           <section className="mb-4">
-            <h6 className="section-title"><i className="bi bi-mic-fill me-1 text-danger"></i>Audio</h6>
-
-            <label className="form-label small">Microfono</label>
-            <select className="form-select mb-3" value={deviceId} onChange={e => setDeviceId(e.target.value)}>
+            <h6 className="section-title"><i className="bi bi-mic-fill me-1 text-danger"></i>Microfono</h6>
+            <select className="form-select" value={deviceId} onChange={e => setDeviceId(e.target.value)}>
               <option value="">Predefinito di sistema</option>
               {devices.map(d => (
                 <option key={d.deviceId} value={d.deviceId}>
@@ -125,17 +98,6 @@ export default function SettingsPanel({
                 </option>
               ))}
             </select>
-
-            <label className="form-label small">Voce di output</label>
-            <select className="form-select" value={voice} onChange={e => setVoice(e.target.value)}>
-              {VOICES.map(v => (
-                <option key={v.id} value={v.id}>{v.name} — {v.description}</option>
-              ))}
-            </select>
-            <div className="small text-secondary mt-1">
-              <i className="bi bi-info-circle me-1"></i>
-              La voce si applica solo al modello generico. <code>gpt-realtime-translate</code> ha una voce automatica.
-            </div>
           </section>
 
           <section className="mb-4">
@@ -175,8 +137,7 @@ export default function SettingsPanel({
               <i className="bi bi-info-circle me-1"></i>
               Lascia vuoto per usare il personaggio cartoon di default: il lip-sync funziona già così.
               Se invece vuoi un volto realistico, incolla qui l’URL di un <code>.glb</code> con blendshapes
-              ARKit (<code>viseme_aa</code>/<code>viseme_E</code>/<code>viseme_O</code> o <code>mouthOpen</code>):
-              il lip-sync li piloterà automaticamente.
+              ARKit (<code>viseme_aa</code>/<code>viseme_E</code>/<code>viseme_O</code> o <code>mouthOpen</code>).
             </div>
 
             <div className="avatar-sources">
@@ -218,30 +179,12 @@ export default function SettingsPanel({
               </label>
             </div>
 
-            <div className="form-check form-switch mb-3">
+            <div className="form-check form-switch">
               <input className="form-check-input" type="checkbox" id="opt-history"
                 checked={showHistory} onChange={e => setShowHistory(e.target.checked)} />
               <label className="form-check-label" htmlFor="opt-history">
                 <i className="bi bi-clock-history me-1"></i> Mantieni cronologia frasi
               </label>
-            </div>
-
-            <label className="form-label small">Stile di traduzione (solo modelli generici)</label>
-            <div className="btn-group w-100" role="group" aria-label="Stile">
-              {[
-                { id: 'natural', label: 'Naturale',   icon: 'bi-stars' },
-                { id: 'default', label: 'Bilanciato', icon: 'bi-sliders2' },
-                { id: 'literal', label: 'Letterale',  icon: 'bi-rulers' }
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`btn btn-outline-primary ${translationMode === opt.id ? 'active' : ''}`}
-                  onClick={() => setTranslationMode(opt.id)}
-                >
-                  <i className={`bi ${opt.icon} me-1`}></i>{opt.label}
-                </button>
-              ))}
             </div>
           </section>
 
@@ -251,10 +194,10 @@ export default function SettingsPanel({
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
               <li>Lip-sync per visemi più fini (PP, FF, KK, RR…)</li>
-              <li>Espressioni emotive sull’avatar (sorride, sopracciglia)</li>
+              <li>Espressioni emotive sull’avatar</li>
               <li>Esportazione MP3/WAV della traduzione</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
-              <li>Sottotitoli sincronizzati word-by-word (delta evidenziati)</li>
+              <li>Sottotitoli sincronizzati word-by-word</li>
             </ul>
           </section>
         </div>

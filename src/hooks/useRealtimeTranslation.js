@@ -1,83 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RealtimeClient, buildTranslationInstructions } from '../utils/realtimeClient.js'
-import { getVadPreset } from '../utils/languages.js'
+import { RealtimeClient } from '../utils/realtimeClient.js'
 
-function buildTurnDetection(presetId) {
-  const p = getVadPreset(presetId)
-  return {
-    type: 'server_vad',
-    threshold: p.threshold,
-    prefix_padding_ms: p.prefix_padding_ms,
-    silence_duration_ms: p.silence_duration_ms,
-    create_response: true
-  }
-}
+const MODEL = 'gpt-realtime-translate'
+const TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
 
-function isTranslateModel(model) {
-  return typeof model === 'string' && /realtime-translate/.test(model)
-}
-
-// Translate sessions (gpt-realtime-translate) use a different shape than
-// chat-style realtime sessions: no `type`, no `model` (it's already in the
-// URL/client_secret), no turn detection, no response lifecycle. The session
-// is a continuous stream of input audio -> output audio + transcript deltas.
-// Docs: https://developers.openai.com/api/docs/guides/realtime-translation
-function buildSessionConfig({
-  model, voice,
-  sourceLangNative, targetLangNative,
-  sourceLangCode, targetLangCode,
-  transcribeInput, transcriptionModel,
-  translationMode, vadPreset
-}) {
-  if (isTranslateModel(model)) {
-    const session = {
-      audio: {
-        output: { language: targetLangCode }
-      }
+// session.update payload for the OpenAI realtime translation session.
+// See https://developers.openai.com/api/docs/guides/realtime-translation
+function buildSessionConfig({ targetLangCode, sourceLangCode, transcribeInput }) {
+  const session = {
+    audio: {
+      output: { language: targetLangCode }
     }
-    if (transcribeInput) {
-      session.audio.input = {
-        transcription: {
-          model: transcriptionModel || 'gpt-realtime-whisper',
-          ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
-        }
-      }
-    }
-    return session
   }
-
-  // Generic gpt-realtime / preview models: keep the chat-style config.
-  const turn_detection = buildTurnDetection(vadPreset)
-  const transcription = transcribeInput
-    ? {
-        model: transcriptionModel || 'gpt-realtime-whisper',
+  if (transcribeInput) {
+    session.audio.input = {
+      transcription: {
+        model: TRANSCRIPTION_MODEL,
         ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
       }
-    : null
-
-  return {
-    type: 'realtime',
-    model,
-    output_modalities: ['audio'],
-    audio: {
-      input:  { transcription, turn_detection },
-      output: { voice }
-    },
-    instructions: buildTranslationInstructions({
-      sourceLang: sourceLangNative,
-      targetLang: targetLangNative,
-      mode: translationMode
-    })
+    }
   }
+  return session
 }
 
 export function useRealtimeTranslation(options) {
   const {
-    apiKey, model, transcriptionModel, voice,
-    sourceLangNative, targetLangNative,
+    apiKey,
     sourceLangCode, targetLangCode,
-    deviceId, translationMode, vadPreset,
-    autoPlayAudio, transcribeInput
+    deviceId, transcribeInput
   } = options
 
   const [status, setStatus] = useState('disconnected')
@@ -110,10 +60,6 @@ export function useRealtimeTranslation(options) {
     }
   }, [])
 
-  useEffect(() => {
-    if (audioElRef.current) audioElRef.current.muted = !autoPlayAudio
-  }, [autoPlayAudio])
-
   const commitToHistory = useCallback(() => {
     if (currentSourceRef.current || currentTranslationRef.current) {
       setHistory(h => [
@@ -132,7 +78,6 @@ export function useRealtimeTranslation(options) {
 
   const handleEvent = useCallback((event) => {
     switch (event.type) {
-      // ---------- Translation session events (gpt-realtime-translate) ----------
       case 'session.input_transcript.delta':
         currentSourceRef.current += event.delta || ''
         setSourceTranscript(currentSourceRef.current)
@@ -160,53 +105,7 @@ export function useRealtimeTranslation(options) {
       case 'session.output_transcript.completed':
         if (event.transcript) currentTranslationRef.current = event.transcript
         setTranslation(currentTranslationRef.current)
-        // history commit happens via the idle timer above
         break
-
-      // ---------- Voice-agent session events (gpt-realtime) ----------
-      case 'input_audio_buffer.speech_started':
-        currentSourceRef.current = ''
-        setSourceTranscript('')
-        setActivity(a => ({ ...a, user: true }))
-        break
-      case 'input_audio_buffer.speech_stopped':
-        setActivity(a => ({ ...a, user: false }))
-        break
-      case 'conversation.item.input_audio_transcription.delta':
-        currentSourceRef.current += event.delta || ''
-        setSourceTranscript(currentSourceRef.current)
-        break
-      case 'conversation.item.input_audio_transcription.completed':
-        currentSourceRef.current = event.transcript || currentSourceRef.current
-        setSourceTranscript(currentSourceRef.current)
-        break
-      case 'response.created':
-        currentTranslationRef.current = ''
-        setTranslation('')
-        setActivity(a => ({ ...a, assistant: true }))
-        break
-      case 'response.output_audio_transcript.delta':
-      case 'response.audio_transcript.delta':
-        currentTranslationRef.current += event.delta || ''
-        setTranslation(currentTranslationRef.current)
-        break
-      case 'response.output_audio_transcript.done':
-      case 'response.audio_transcript.done':
-        currentTranslationRef.current = event.transcript || currentTranslationRef.current
-        setTranslation(currentTranslationRef.current)
-        break
-      case 'response.output_text.delta':
-      case 'response.text.delta':
-        if (!currentTranslationRef.current.length) {
-          currentTranslationRef.current += event.delta || ''
-          setTranslation(currentTranslationRef.current)
-        }
-        break
-      case 'response.done':
-        setActivity(a => ({ ...a, assistant: false }))
-        commitToHistory()
-        break
-
       case 'error':
         setError(event.error?.message || 'Errore sconosciuto dalla Realtime API')
         break
@@ -223,7 +122,7 @@ export function useRealtimeTranslation(options) {
     setError(null)
     const client = new RealtimeClient({
       apiKey,
-      model,
+      model: MODEL,
       onEvent: handleEvent,
       onStatus: setStatus,
       onTrack: (stream) => {
@@ -240,11 +139,7 @@ export function useRealtimeTranslation(options) {
     try {
       await client.connect({ deviceId })
       client.updateSession(buildSessionConfig({
-        model, voice,
-        sourceLangNative, targetLangNative,
-        sourceLangCode, targetLangCode,
-        transcribeInput, transcriptionModel,
-        translationMode, vadPreset
+        sourceLangCode, targetLangCode, transcribeInput
       }))
     } catch (err) {
       setError(err.message)
@@ -253,7 +148,7 @@ export function useRealtimeTranslation(options) {
       clientRef.current = null
       setRemoteStream(null)
     }
-  }, [apiKey, model, transcriptionModel, voice, sourceLangNative, targetLangNative, sourceLangCode, targetLangCode, deviceId, translationMode, vadPreset, transcribeInput, handleEvent])
+  }, [apiKey, sourceLangCode, targetLangCode, deviceId, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -283,17 +178,14 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
+  // Live re-config while the session is open (e.g. user swaps languages)
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession(buildSessionConfig({
-        model, voice,
-        sourceLangNative, targetLangNative,
-        sourceLangCode, targetLangCode,
-        transcribeInput, transcriptionModel,
-        translationMode, vadPreset
+        sourceLangCode, targetLangCode, transcribeInput
       }))
     }
-  }, [sourceLangNative, targetLangNative, sourceLangCode, targetLangCode, translationMode, voice, transcriptionModel, transcribeInput, vadPreset, model, status])
+  }, [sourceLangCode, targetLangCode, transcribeInput, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()

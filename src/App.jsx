@@ -3,7 +3,6 @@ import { LANGUAGES, getLanguage } from './utils/languages.js'
 import { useRealtimeTranslation } from './hooks/useRealtimeTranslation.js'
 import Header from './components/Header.jsx'
 import LanguageSelector from './components/LanguageSelector.jsx'
-import SpeedSelector from './components/SpeedSelector.jsx'
 import MicButton from './components/MicButton.jsx'
 import TranscriptPanel from './components/TranscriptPanel.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
@@ -12,14 +11,11 @@ import HistoryList from './components/HistoryList.jsx'
 
 const Avatar3D = lazy(() => import('./components/Avatar3D.jsx'))
 
-const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || 'gpt-realtime-translate'
-const DEFAULT_TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
+// Single, fixed model: the dedicated realtime translation engine.
+const MODEL = 'gpt-realtime-translate'
 
 export default function App() {
   const [apiKey, setApiKey]           = useState(() => localStorage.getItem('rt_api_key') || '')
-  const [model, setModel]             = useState(() => localStorage.getItem('rt_model') || DEFAULT_MODEL)
-  const [transcriptionModel, setTranscriptionModel] = useState(() => localStorage.getItem('rt_tr_model') || DEFAULT_TRANSCRIPTION_MODEL)
-  const [voice, setVoice]             = useState(() => localStorage.getItem('rt_voice') || 'alloy')
   const [sourceLang, setSourceLang]   = useState(() => localStorage.getItem('rt_source') || 'it')
   const [targetLang, setTargetLang]   = useState(() => localStorage.getItem('rt_target') || 'en')
   const [deviceId, setDeviceId]       = useState(() => localStorage.getItem('rt_device') || '')
@@ -28,8 +24,6 @@ export default function App() {
 
   const [autoPlayAudio, setAutoPlayAudio]   = useState(() => localStorage.getItem('rt_autoplay') !== '0')
   const [transcribeInput, setTranscribeInput] = useState(() => localStorage.getItem('rt_transcribe') !== '0')
-  const [translationMode, setTranslationMode] = useState(() => localStorage.getItem('rt_mode') || 'natural')
-  const [vadPreset, setVadPreset]             = useState(() => localStorage.getItem('rt_vad') || 'balanced')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
   const [showAvatar, setShowAvatar]           = useState(() => localStorage.getItem('rt_avatar') !== '0')
   const [avatarUrl, setAvatarUrl]             = useState(() => localStorage.getItem('rt_avatar_url') || '')
@@ -43,26 +37,19 @@ export default function App() {
     audioElement,
     connect, disconnect, toggleMute, clearHistory
   } = useRealtimeTranslation({
-    apiKey, model, transcriptionModel, voice,
-    sourceLangNative: sourceLanguage.native,
-    targetLangNative: targetLanguage.native,
+    apiKey,
     sourceLangCode: sourceLanguage.code,
     targetLangCode: targetLanguage.code,
-    deviceId, translationMode, vadPreset,
-    autoPlayAudio, transcribeInput
+    deviceId,
+    transcribeInput
   })
 
   useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },       [apiKey])
-  useEffect(() => { localStorage.setItem('rt_model', model) },          [model])
-  useEffect(() => { localStorage.setItem('rt_tr_model', transcriptionModel) }, [transcriptionModel])
-  useEffect(() => { localStorage.setItem('rt_voice', voice) },          [voice])
   useEffect(() => { localStorage.setItem('rt_source', sourceLang) },    [sourceLang])
   useEffect(() => { localStorage.setItem('rt_target', targetLang) },    [targetLang])
   useEffect(() => { localStorage.setItem('rt_device', deviceId) },      [deviceId])
   useEffect(() => { localStorage.setItem('rt_autoplay', autoPlayAudio ? '1' : '0') }, [autoPlayAudio])
   useEffect(() => { localStorage.setItem('rt_transcribe', transcribeInput ? '1' : '0') }, [transcribeInput])
-  useEffect(() => { localStorage.setItem('rt_mode', translationMode) }, [translationMode])
-  useEffect(() => { localStorage.setItem('rt_vad', vadPreset) },        [vadPreset])
   useEffect(() => { localStorage.setItem('rt_history', showHistory ? '1' : '0') }, [showHistory])
   useEffect(() => { localStorage.setItem('rt_avatar', showAvatar ? '1' : '0') }, [showAvatar])
   useEffect(() => { localStorage.setItem('rt_avatar_url', avatarUrl) }, [avatarUrl])
@@ -120,7 +107,7 @@ export default function App() {
           <p className="text-secondary mb-0">
             Parla nel microfono e ascolta la traduzione mentre parli.
             <br className="d-none d-md-inline" />
-            Funziona da PC e da smartphone, motore <code>{model}</code>.
+            Motore <code>{MODEL}</code> di OpenAI.
           </p>
         </section>
 
@@ -133,8 +120,6 @@ export default function App() {
               onTargetChange={setTargetLang}
               onSwap={swapLanguages}
             />
-
-            <SpeedSelector value={vadPreset} onChange={setVadPreset} />
 
             {showAvatar && (
               <div className="d-flex justify-content-center mt-4">
@@ -236,7 +221,7 @@ export default function App() {
 
         <footer className="text-center mt-5 mb-3 text-secondary small">
           <i className="bi bi-stars me-1"></i>
-          Powered by OpenAI Realtime API · Bootstrap 5 · React · Three.js
+          Powered by OpenAI Realtime Translation · Bootstrap 5 · React · Three.js
         </footer>
       </main>
 
@@ -244,14 +229,10 @@ export default function App() {
         open={showSettings}
         onClose={() => setShowSettings(false)}
         apiKey={apiKey} setApiKey={setApiKey}
-        model={model} setModel={setModel}
-        transcriptionModel={transcriptionModel} setTranscriptionModel={setTranscriptionModel}
-        voice={voice} setVoice={setVoice}
         deviceId={deviceId} setDeviceId={setDeviceId}
         devices={devices}
         autoPlayAudio={autoPlayAudio} setAutoPlayAudio={setAutoPlayAudio}
         transcribeInput={transcribeInput} setTranscribeInput={setTranscribeInput}
-        translationMode={translationMode} setTranslationMode={setTranslationMode}
         showHistory={showHistory} setShowHistory={setShowHistory}
         showAvatar={showAvatar} setShowAvatar={setShowAvatar}
         avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
