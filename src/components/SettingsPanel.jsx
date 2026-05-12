@@ -1,28 +1,5 @@
 import { useState } from 'react'
 
-const AVATAR_SOURCES = [
-  {
-    name: 'Avaturn',
-    url: 'https://avaturn.me/',
-    desc: 'Genera un avatar realistico da una foto. Esporta .glb con blendshapes ARKit (mouthOpen, viseme_aa…).'
-  },
-  {
-    name: 'Sketchfab',
-    url: 'https://sketchfab.com/search?features=downloadable&type=models&q=arkit+head',
-    desc: 'Marketplace di modelli 3D. Filtra per “downloadable” + “ARKit”. Scarica un .glb e hostalo dove preferisci.'
-  },
-  {
-    name: 'VRoid Studio',
-    url: 'https://vroid.com/en/studio',
-    desc: 'Editor gratuito di avatar in stile anime. Esporta VRM, da convertire in .glb con vrm-converter o blender.'
-  },
-  {
-    name: 'Khronos Sample Models',
-    url: 'https://github.com/KhronosGroup/glTF-Sample-Assets',
-    desc: 'Repository ufficiale di modelli .glb open-source. Servili via raw.githubusercontent.com o jsdelivr CDN.'
-  }
-]
-
 export default function SettingsPanel({
   open, onClose,
   apiKey, setApiKey,
@@ -30,9 +7,7 @@ export default function SettingsPanel({
   devices,
   autoPlayAudio, setAutoPlayAudio,
   transcribeInput, setTranscribeInput,
-  showHistory, setShowHistory,
-  showAvatar, setShowAvatar,
-  avatarUrl, setAvatarUrl
+  showHistory, setShowHistory
 }) {
   const [showKey, setShowKey] = useState(false)
 
@@ -101,66 +76,6 @@ export default function SettingsPanel({
           </section>
 
           <section className="mb-4">
-            <h6 className="section-title"><i className="bi bi-emoji-smile me-1 text-success"></i>Avatar 3D</h6>
-
-            <div className="form-check form-switch mb-3">
-              <input className="form-check-input" type="checkbox" id="opt-avatar"
-                checked={showAvatar} onChange={e => setShowAvatar(e.target.checked)} />
-              <label className="form-check-label" htmlFor="opt-avatar">
-                Mostra avatar 3D parlante
-              </label>
-            </div>
-
-            <label className="form-label small">URL di un avatar .glb (opzionale)</label>
-            <div className="input-group mb-2">
-              <input
-                type="url"
-                className="form-control"
-                placeholder="https://…/avatar.glb"
-                value={avatarUrl}
-                onChange={e => setAvatarUrl(e.target.value)}
-                spellCheck="false"
-              />
-              {avatarUrl && (
-                <button
-                  className="btn btn-outline-secondary"
-                  type="button"
-                  onClick={() => setAvatarUrl('')}
-                  title="Rimuovi URL e usa l’avatar cartoon di default"
-                  aria-label="Rimuovi"
-                >
-                  <i className="bi bi-x-lg"></i>
-                </button>
-              )}
-            </div>
-            <div className="small text-secondary mb-3">
-              <i className="bi bi-info-circle me-1"></i>
-              Lascia vuoto per usare il personaggio cartoon di default: il lip-sync funziona già così.
-              Se invece vuoi un volto realistico, incolla qui l’URL di un <code>.glb</code> con blendshapes
-              ARKit (<code>viseme_aa</code>/<code>viseme_E</code>/<code>viseme_O</code> o <code>mouthOpen</code>).
-            </div>
-
-            <div className="avatar-sources">
-              <div className="small fw-semibold mb-2 text-secondary">Sorgenti gratuite di avatar .glb:</div>
-              {AVATAR_SOURCES.map(s => (
-                <a
-                  key={s.url}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="avatar-source-link"
-                >
-                  <div className="d-flex align-items-center gap-2">
-                    <i className="bi bi-box-arrow-up-right"></i>
-                    <strong>{s.name}</strong>
-                  </div>
-                  <div className="small text-secondary mt-1">{s.desc}</div>
-                </a>
-              ))}
-            </div>
-          </section>
-
-          <section className="mb-4">
             <h6 className="section-title"><i className="bi bi-sliders me-1 text-info"></i>Opzioni</h6>
 
             <div className="form-check form-switch mb-2">
@@ -193,8 +108,6 @@ export default function SettingsPanel({
             <ul className="small text-secondary mb-0 ps-3">
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
-              <li>Lip-sync per visemi più fini (PP, FF, KK, RR…)</li>
-              <li>Espressioni emotive sull’avatar</li>
               <li>Esportazione MP3/WAV della traduzione</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
               <li>Sottotitoli sincronizzati word-by-word</li>

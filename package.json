@@ -14,12 +14,10 @@
     "prebuild": "npm run assets"
   },
   "dependencies": {
-    "@react-three/fiber": "^8.17.10",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "three": "^0.171.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

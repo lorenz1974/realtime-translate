@@ -5,33 +5,22 @@ const MODEL = 'gpt-realtime-translate'
 const TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
 
 // session.update payload for the OpenAI realtime translation session.
-// See https://developers.openai.com/api/docs/guides/realtime-translation
-//
-// The translation transcription block accepts ONLY { model }; passing a
-// `language` hint there is rejected with "Unknown parameter". When the API
-// rejects the session.update the WHOLE payload is dropped, including
-// `audio.output.language`, and the model falls back to its default target
-// (Spanish). So we keep the payload strictly minimal.
+// Strictly minimal per the docs: only `audio.output.language` and an
+// optional `audio.input.transcription.model`. Anything else (language
+// hint on the transcription, voice, instructions...) is rejected and
+// causes the WHOLE update to be discarded.
 function buildSessionConfig({ targetLangCode, transcribeInput }) {
   const session = {
-    audio: {
-      output: { language: targetLangCode }
-    }
+    audio: { output: { language: targetLangCode } }
   }
   if (transcribeInput) {
-    session.audio.input = {
-      transcription: { model: TRANSCRIPTION_MODEL }
-    }
+    session.audio.input = { transcription: { model: TRANSCRIPTION_MODEL } }
   }
   return session
 }
 
 export function useRealtimeTranslation(options) {
-  const {
-    apiKey,
-    targetLangCode,
-    deviceId, transcribeInput
-  } = options
+  const { apiKey, targetLangCode, deviceId, transcribeInput } = options
 
   const [status, setStatus] = useState('disconnected')
   const [error, setError] = useState(null)
@@ -40,14 +29,12 @@ export function useRealtimeTranslation(options) {
   const [translation, setTranslation] = useState('')
   const [history, setHistory] = useState([])
   const [activity, setActivity] = useState({ user: false, assistant: false })
-  const [remoteStream, setRemoteStream] = useState(null)
-  const [audioElement, setAudioElement] = useState(null)
 
   const clientRef = useRef(null)
   const audioElRef = useRef(null)
   const currentSourceRef = useRef('')
   const currentTranslationRef = useRef('')
-  const speakingTimerRef = useRef(null)
+  const idleTimerRef = useRef(null)
 
   useEffect(() => {
     const el = document.createElement('audio')
@@ -56,28 +43,32 @@ export function useRealtimeTranslation(options) {
     el.style.display = 'none'
     document.body.appendChild(el)
     audioElRef.current = el
-    setAudioElement(el)
-    return () => {
-      el.srcObject = null
-      el.remove()
-    }
+    return () => { el.srcObject = null; el.remove() }
   }, [])
 
   const commitToHistory = useCallback(() => {
     if (currentSourceRef.current || currentTranslationRef.current) {
-      setHistory(h => [
-        {
-          id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-          source: currentSourceRef.current,
-          translation: currentTranslationRef.current,
-          ts: Date.now()
-        },
-        ...h
-      ].slice(0, 50))
+      const entry = {
+        id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        source: currentSourceRef.current,
+        translation: currentTranslationRef.current,
+        ts: Date.now()
+      }
+      setHistory(h => [entry, ...h].slice(0, 50))
       currentSourceRef.current = ''
       currentTranslationRef.current = ''
+      setSourceTranscript('')
+      setTranslation('')
     }
   }, [])
+
+  const scheduleIdleCommit = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = setTimeout(() => {
+      setActivity(a => ({ ...a, assistant: false }))
+      commitToHistory()
+    }, 1800)
+  }, [commitToHistory])
 
   const handleEvent = useCallback((event) => {
     switch (event.type) {
@@ -88,26 +79,30 @@ export function useRealtimeTranslation(options) {
         break
       case 'session.input_transcript.done':
       case 'session.input_transcript.completed':
-        if (event.transcript) currentSourceRef.current = event.transcript
-        setSourceTranscript(currentSourceRef.current)
+        if (event.transcript) {
+          currentSourceRef.current = event.transcript
+          setSourceTranscript(currentSourceRef.current)
+        }
         setActivity(a => ({ ...a, user: false }))
         break
       case 'session.output_transcript.delta':
         currentTranslationRef.current += event.delta || ''
         setTranslation(currentTranslationRef.current)
         setActivity(a => ({ ...a, assistant: true }))
-        if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
-        speakingTimerRef.current = setTimeout(() => {
-          setActivity(a => ({ ...a, assistant: false }))
-          commitToHistory()
-          setSourceTranscript('')
-          setTranslation('')
-        }, 1800)
+        scheduleIdleCommit()
         break
       case 'session.output_transcript.done':
       case 'session.output_transcript.completed':
-        if (event.transcript) currentTranslationRef.current = event.transcript
-        setTranslation(currentTranslationRef.current)
+        if (event.transcript) {
+          currentTranslationRef.current = event.transcript
+          setTranslation(currentTranslationRef.current)
+        }
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current)
+          idleTimerRef.current = null
+        }
+        setActivity(a => ({ ...a, assistant: false }))
+        commitToHistory()
         break
       case 'error':
         setError(event.error?.message || 'Errore sconosciuto dalla Realtime API')
@@ -115,7 +110,7 @@ export function useRealtimeTranslation(options) {
       default:
         break
     }
-  }, [commitToHistory])
+  }, [commitToHistory, scheduleIdleCommit])
 
   const connect = useCallback(async () => {
     if (!apiKey) {
@@ -133,7 +128,6 @@ export function useRealtimeTranslation(options) {
           audioElRef.current.srcObject = stream
           audioElRef.current.play?.().catch(() => {})
         }
-        setRemoteStream(stream)
       },
       onError: (err) => setError(err.message)
     })
@@ -141,15 +135,12 @@ export function useRealtimeTranslation(options) {
 
     try {
       await client.connect({ deviceId })
-      client.updateSession(buildSessionConfig({
-        targetLangCode, transcribeInput
-      }))
+      client.updateSession(buildSessionConfig({ targetLangCode, transcribeInput }))
     } catch (err) {
       setError(err.message)
       setStatus('error')
       client.disconnect()
       clientRef.current = null
-      setRemoteStream(null)
     }
   }, [apiKey, targetLangCode, deviceId, transcribeInput, handleEvent])
 
@@ -158,14 +149,15 @@ export function useRealtimeTranslation(options) {
       clientRef.current.disconnect()
       clientRef.current = null
     }
-    if (speakingTimerRef.current) {
-      clearTimeout(speakingTimerRef.current)
-      speakingTimerRef.current = null
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
     }
+    // Flush whatever was in flight
+    commitToHistory()
     setStatus('disconnected')
     setActivity({ user: false, assistant: false })
-    setRemoteStream(null)
-  }, [])
+  }, [commitToHistory])
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
@@ -179,26 +171,25 @@ export function useRealtimeTranslation(options) {
     setHistory([])
     setSourceTranscript('')
     setTranslation('')
+    currentSourceRef.current = ''
+    currentTranslationRef.current = ''
   }, [])
 
-  // Live re-config while the session is open (e.g. user swaps languages)
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
-      clientRef.current.updateSession(buildSessionConfig({
-        targetLangCode, transcribeInput
-      }))
+      clientRef.current.updateSession(buildSessionConfig({ targetLangCode, transcribeInput }))
     }
   }, [targetLangCode, transcribeInput, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()
-    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
   }, [])
 
+  // audioElement was used by the avatar lip-sync, no longer exposed.
   return {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    remoteStream, audioElement,
     connect, disconnect, toggleMute, clearHistory
   }
 }
