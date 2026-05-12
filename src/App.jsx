@@ -13,8 +13,6 @@ const MODEL = 'gpt-realtime-translate'
 
 export default function App() {
   const [apiKey, setApiKey]           = useState(() => localStorage.getItem('rt_api_key') || '')
-  // Two language slots: A and B. In one-way mode A -> B; in conversation mode
-  // the system auto-swaps based on the detected speaker language.
   const [langA, setLangA]             = useState(() => localStorage.getItem('rt_lang_a') || 'it')
   const [langB, setLangB]             = useState(() => localStorage.getItem('rt_lang_b') || 'en')
   const [conversationMode, setConversationMode] = useState(() => localStorage.getItem('rt_conv') === '1')
@@ -29,7 +27,7 @@ export default function App() {
   const {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
-    activeSourceCode, activeTargetCode,
+    activeSourceCode, activeTargetCode, directionLocked,
     connect, disconnect, toggleMute, clearHistory, swap
   } = useRealtimeTranslation({
     apiKey,
@@ -39,6 +37,9 @@ export default function App() {
 
   const activeSourceLanguage = useMemo(() => getLanguage(activeSourceCode), [activeSourceCode])
   const activeTargetLanguage = useMemo(() => getLanguage(activeTargetCode), [activeTargetCode])
+  const langALanguage = useMemo(() => getLanguage(langA), [langA])
+  const langBLanguage = useMemo(() => getLanguage(langB), [langB])
+  const showAutoDetect = conversationMode && !directionLocked
 
   useEffect(() => { localStorage.setItem('rt_api_key', apiKey) },       [apiKey])
   useEffect(() => { localStorage.setItem('rt_lang_a', langA) },         [langA])
@@ -132,7 +133,7 @@ export default function App() {
               </div>
               <div className="small text-secondary mt-1">
                 {conversationMode
-                  ? 'Il sistema riconosce in quale delle due lingue stai parlando e cambia automaticamente la direzione di traduzione.'
+                  ? 'Le due lingue sono parlate da due persone; il sistema rileva chi sta parlando e gira la traduzione nel verso giusto.'
                   : 'Traduce sempre dalla lingua di sinistra a quella di destra.'}
               </div>
             </div>
@@ -158,7 +159,13 @@ export default function App() {
                   {isMuted ? 'Microfono in pausa' : 'Microfono attivo'}
                 </span>
               )}
-              {isConnected && (
+              {isConnected && showAutoDetect && (
+                <span className="badge rounded-pill bg-warning-subtle text-warning-emphasis">
+                  <i className="bi bi-arrow-repeat spinning me-1"></i>
+                  In attesa: {langALanguage.flag} {langALanguage.name} / {langBLanguage.flag} {langBLanguage.name}
+                </span>
+              )}
+              {isConnected && !showAutoDetect && (
                 <span className="badge rounded-pill bg-primary-subtle text-primary-emphasis">
                   <i className="bi bi-arrow-right me-1"></i>
                   {activeSourceLanguage.flag} {activeSourceLanguage.name} → {activeTargetLanguage.flag} {activeTargetLanguage.name}
@@ -200,18 +207,22 @@ export default function App() {
             <TranscriptPanel
               icon="bi-mic"
               variant="from-primary"
-              language={activeSourceLanguage}
+              language={showAutoDetect ? { flag: '🎙️', name: 'Rilevamento…' } : activeSourceLanguage}
               label="Sorgente"
               text={sourceTranscript}
               speaking={activity.user}
-              placeholder={transcribeInput ? 'Inizia a parlare per vedere il testo trascritto qui.' : 'Trascrizione disattivata nelle impostazioni.'}
+              placeholder={transcribeInput
+                ? (conversationMode
+                    ? 'Parla in una delle due lingue: il sistema riconosce qual è e imposta la direzione di traduzione.'
+                    : 'Inizia a parlare per vedere il testo trascritto qui.')
+                : 'Trascrizione disattivata nelle impostazioni.'}
             />
           </div>
           <div className="col-md-6">
             <TranscriptPanel
               icon="bi-translate"
               variant="from-accent"
-              language={activeTargetLanguage}
+              language={showAutoDetect ? { flag: '🔄', name: 'Auto' } : activeTargetLanguage}
               label="Traduzione"
               text={translation}
               speaking={activity.assistant}
