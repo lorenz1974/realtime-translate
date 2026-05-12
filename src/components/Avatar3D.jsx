@@ -1,24 +1,35 @@
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { useAudioAmplitude } from '../hooks/useAudioAmplitude.js'
+import { useViseme } from '../hooks/useViseme.js'
+
+// Helper: set the influence of every blendshape name in `names` that exists
+// on the given mesh, ignoring those that don't.
+function setMorph(mesh, names, value) {
+  const dict = mesh.morphTargetDictionary
+  const inf  = mesh.morphTargetInfluences
+  if (!dict || !inf) return
+  for (const n of names) {
+    if (dict[n] !== undefined) inf[dict[n]] = value
+  }
+}
 
 // ----------------- CARTOON FACE (default fallback) ----------------------
-function CartoonFace({ amplitudeRef }) {
+function CartoonFace({ visemeRef }) {
   const headRef       = useRef()
   const mouthRef      = useRef()
   const leftEyeRef    = useRef()
   const rightEyeRef   = useRef()
 
-  const smoothMouth   = useRef(0)
-  const time          = useRef(0)
-  const blinkValue    = useRef(0)
-  const nextBlinkIn   = useRef(2 + Math.random() * 3)
+  const smoothY = useRef(0.06)
+  const smoothX = useRef(1)
+  const time    = useRef(0)
+  const blink   = useRef(0)
+  const nextBlink = useRef(2 + Math.random() * 3)
 
   useFrame((_, dt) => {
     time.current += dt
-    const amp = amplitudeRef?.current || 0
-    const isAudible = amp > 0.005
+    const v = visemeRef?.current || { aa: 0, ee: 0, oo: 0, energy: 0 }
 
     if (headRef.current) {
       const breath = Math.sin(time.current * 1.4) * 0.015
@@ -27,23 +38,27 @@ function CartoonFace({ amplitudeRef }) {
       headRef.current.rotation.x = Math.sin(time.current * 0.80) * 0.05
     }
 
-    // Bocca pilotata DIRETTAMENTE dall'ampiezza audio: continua a muoversi
-    // per tutta la durata del playback, non solo durante l'emissione RTP.
-    const wiggle = isAudible ? Math.abs(Math.sin(time.current * 13)) * 0.08 : 0
-    const targetMouth = Math.min(amp * 7 + wiggle, 1.7)
-    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 22, 1)
+    // Combine the three viseme weights into mouth scale:
+    //   AA -> tall mouth
+    //   OO -> tall + narrow
+    //   EE -> wide + short
+    const targetY = 0.06 + v.aa * 1.7 + v.oo * 1.1 + v.ee * 0.15
+    const targetX = 1 + v.ee * 0.6 - v.oo * 0.4 - v.aa * 0.15
+
+    smoothY.current += (targetY - smoothY.current) * Math.min(dt * 22, 1)
+    smoothX.current += (targetX - smoothX.current) * Math.min(dt * 22, 1)
     if (mouthRef.current) {
-      mouthRef.current.scale.y = Math.max(smoothMouth.current, 0.06)
-      mouthRef.current.scale.x = 1 - smoothMouth.current * 0.2
+      mouthRef.current.scale.y = smoothY.current
+      mouthRef.current.scale.x = smoothX.current
     }
 
-    nextBlinkIn.current -= dt
-    if (nextBlinkIn.current <= 0) {
-      blinkValue.current = 1
-      nextBlinkIn.current = 2.5 + Math.random() * 3
+    nextBlink.current -= dt
+    if (nextBlink.current <= 0) {
+      blink.current = 1
+      nextBlink.current = 2.5 + Math.random() * 3
     }
-    blinkValue.current = Math.max(0, blinkValue.current - dt * 9)
-    const eyeScale = 1 - blinkValue.current * 0.92
+    blink.current = Math.max(0, blink.current - dt * 9)
+    const eyeScale = 1 - blink.current * 0.92
     if (leftEyeRef.current)  leftEyeRef.current.scale.y  = eyeScale
     if (rightEyeRef.current) rightEyeRef.current.scale.y = eyeScale
   })
@@ -103,14 +118,21 @@ function CartoonFace({ amplitudeRef }) {
 }
 
 // ----------------- GLB AVATAR (Ready Player Me, custom) ------------------
-function GLBAvatar({ url, amplitudeRef }) {
+// Drives ARKit viseme blendshapes properly:
+//   viseme_aa / mouthOpen / jawOpen   <- AA weight
+//   viseme_E  / mouthSmile             <- EE weight
+//   viseme_O  / viseme_U / mouthPucker <- OO weight
+//   eyeBlinkLeft/Right                 <- blink
+function GLBAvatar({ url, visemeRef }) {
   const [scene, setScene]    = useState(null)
   const morphMeshes          = useRef([])
   const rootRef              = useRef()
-  const smoothMouth          = useRef(0)
+  const smoothAa             = useRef(0)
+  const smoothEe             = useRef(0)
+  const smoothOo             = useRef(0)
   const time                 = useRef(0)
-  const blinkValue           = useRef(0)
-  const nextBlinkIn          = useRef(3 + Math.random() * 3)
+  const blink                = useRef(0)
+  const nextBlink            = useRef(3 + Math.random() * 3)
 
   useEffect(() => {
     if (!url) return
@@ -137,36 +159,32 @@ function GLBAvatar({ url, amplitudeRef }) {
 
   useFrame((_, dt) => {
     time.current += dt
-    const amp = amplitudeRef?.current || 0
-    const isAudible = amp > 0.005
+    const v = visemeRef?.current || { aa: 0, ee: 0, oo: 0, energy: 0 }
 
     if (rootRef.current) {
       rootRef.current.rotation.y = Math.sin(time.current * 0.5) * 0.10
     }
 
-    const wiggle = isAudible ? Math.abs(Math.sin(time.current * 13)) * 0.06 : 0
-    const targetMouth = Math.min(amp * 5.5 + wiggle, 1)
-    smoothMouth.current += (targetMouth - smoothMouth.current) * Math.min(dt * 22, 1)
+    smoothAa.current += (v.aa - smoothAa.current) * Math.min(dt * 22, 1)
+    smoothEe.current += (v.ee - smoothEe.current) * Math.min(dt * 22, 1)
+    smoothOo.current += (v.oo - smoothOo.current) * Math.min(dt * 22, 1)
 
-    nextBlinkIn.current -= dt
-    if (nextBlinkIn.current <= 0) {
-      blinkValue.current = 1
-      nextBlinkIn.current = 3 + Math.random() * 3
+    nextBlink.current -= dt
+    if (nextBlink.current <= 0) {
+      blink.current = 1
+      nextBlink.current = 3 + Math.random() * 3
     }
-    blinkValue.current = Math.max(0, blinkValue.current - dt * 9)
-
-    const mouthCandidates = ['mouthOpen', 'jawOpen', 'viseme_aa', 'mouth_Open', 'jaw_open', 'A', 'AA']
-    const blinkCandidates = ['eyesClosed', 'eyeBlinkLeft', 'eyeBlinkRight', 'blink_L', 'blink_R', 'Blink']
+    blink.current = Math.max(0, blink.current - dt * 9)
 
     for (const mesh of morphMeshes.current) {
-      const dict = mesh.morphTargetDictionary
-      const inf  = mesh.morphTargetInfluences
-      for (const name of mouthCandidates) {
-        if (dict[name] !== undefined) inf[dict[name]] = smoothMouth.current
-      }
-      for (const name of blinkCandidates) {
-        if (dict[name] !== undefined) inf[dict[name]] = blinkValue.current
-      }
+      // AA  -> open vowels
+      setMorph(mesh, ['viseme_aa', 'viseme_AA', 'mouthOpen', 'jawOpen', 'A', 'AA'], smoothAa.current)
+      // EE  -> smile / bright vowels
+      setMorph(mesh, ['viseme_E', 'viseme_e', 'viseme_I', 'mouthSmile', 'mouthSmileLeft', 'mouthSmileRight'], smoothEe.current)
+      // OO  -> rounded / dark vowels
+      setMorph(mesh, ['viseme_O', 'viseme_o', 'viseme_U', 'mouthPucker', 'mouthFunnel'], smoothOo.current)
+      // Blink
+      setMorph(mesh, ['eyeBlinkLeft', 'eyeBlinkRight', 'eyesClosed', 'blink_L', 'blink_R'], blink.current)
     }
   })
 
@@ -176,7 +194,7 @@ function GLBAvatar({ url, amplitudeRef }) {
 
 // ----------------- AVATAR ROOT -----------------------------------------
 export default function Avatar3D({ audioElement, speaking, glbUrl }) {
-  const amplitudeRef = useAudioAmplitude(audioElement)
+  const visemeRef = useViseme(audioElement)
   const useGlb = !!(glbUrl && glbUrl.trim().length > 0)
 
   return (
@@ -195,11 +213,11 @@ export default function Avatar3D({ audioElement, speaking, glbUrl }) {
         <pointLight position={[-3, 1, -2]} intensity={0.45} color="#a5b4fc" />
         <pointLight position={[2, -2, 3]}  intensity={0.30} color="#f9a8d4" />
         {useGlb ? (
-          <Suspense fallback={<CartoonFace amplitudeRef={amplitudeRef} />}>
-            <GLBAvatar url={glbUrl} amplitudeRef={amplitudeRef} />
+          <Suspense fallback={<CartoonFace visemeRef={visemeRef} />}>
+            <GLBAvatar url={glbUrl} visemeRef={visemeRef} />
           </Suspense>
         ) : (
-          <CartoonFace amplitudeRef={amplitudeRef} />
+          <CartoonFace visemeRef={visemeRef} />
         )}
       </Canvas>
       {speaking && (
