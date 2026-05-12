@@ -1,21 +1,29 @@
 import { useState } from 'react'
 import { VOICES } from '../utils/languages.js'
 
+// Sorgenti di avatar .glb verificate. Ready Player Me è stato dismesso,
+// quindi qui elenchiamo solo piattaforme ancora attive o repository
+// pubblici di modelli scaricabili.
 const AVATAR_SOURCES = [
-  {
-    name: 'Ready Player Me',
-    url: 'https://readyplayerme.com/',
-    desc: 'Crea un avatar realistico full-body in 1 minuto. Esporta un URL .glb pronto all’uso.'
-  },
   {
     name: 'Avaturn',
     url: 'https://avaturn.me/',
-    desc: 'Avatar da una foto, esporta .glb con blendshapes compatibili ARKit.'
+    desc: 'Genera un avatar realistico da una foto. Esporta .glb con blendshapes ARKit (mouthOpen, viseme_aa…).'
   },
   {
     name: 'Sketchfab',
     url: 'https://sketchfab.com/search?features=downloadable&type=models&q=arkit+head',
-    desc: 'Cerca modelli gratuiti con “ARKit blendshapes”. Scarica .glb e hostalo su un CDN o nel repo.'
+    desc: 'Marketplace di modelli 3D. Filtra per “downloadable” + “ARKit”. Scarica un .glb e hostalo dove preferisci.'
+  },
+  {
+    name: 'VRoid Studio',
+    url: 'https://vroid.com/en/studio',
+    desc: 'Editor gratuito di avatar in stile anime. Esporta VRM, da convertire in .glb con vrm-converter o blender.'
+  },
+  {
+    name: 'Khronos Sample Models',
+    url: 'https://github.com/KhronosGroup/glTF-Sample-Assets',
+    desc: 'Repository ufficiale di modelli .glb open-source. Servili via raw.githubusercontent.com o jsdelivr CDN.'
   }
 ]
 
@@ -156,7 +164,10 @@ export default function SettingsPanel({
             </div>
             <div className="small text-secondary mb-3">
               <i className="bi bi-info-circle me-1"></i>
-              Lascia vuoto per usare l’avatar cartoon di default. Per un avatar realistico incolla qui l’URL di un file <code>.glb</code> con blendshapes ARKit (<code>mouthOpen</code>/<code>jawOpen</code>, <code>eyeBlinkLeft/Right</code>): il lip-sync verrà attivato automaticamente.
+              Lascia vuoto per usare il personaggio cartoon di default: il lip-sync funziona già così.
+              Se invece vuoi un volto realistico, incolla qui l’URL di un <code>.glb</code> con blendshapes
+              ARKit (<code>viseme_aa</code>/<code>viseme_E</code>/<code>viseme_O</code> o <code>mouthOpen</code>):
+              il lip-sync li piloterà automaticamente.
             </div>
 
             <div className="avatar-sources">
@@ -230,7 +241,7 @@ export default function SettingsPanel({
             <ul className="small text-secondary mb-0 ps-3">
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
-              <li>Lip-sync per visemi (mappa fonemi su viseme_aa, viseme_O…)</li>
+              <li>Lip-sync per visemi più fini (PP, FF, KK, RR…)</li>
               <li>Espressioni emotive sull’avatar (sorride, sopracciglia)</li>
               <li>Esportazione MP3/WAV della traduzione</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
