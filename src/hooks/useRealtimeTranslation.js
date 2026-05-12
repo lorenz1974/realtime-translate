@@ -13,10 +13,65 @@ function buildTurnDetection(presetId) {
   }
 }
 
+// gpt-realtime-translate is a specialized translation model with a dedicated
+// API surface: instead of a system prompt it takes `output_language` (ISO
+// code) plus the standard audio input/output config. Sending `instructions`
+// like a generic chat model makes it refuse to translate.
+function isTranslateModel(model) {
+  return typeof model === 'string' && /realtime-translate/.test(model)
+}
+
+function buildSessionConfig({
+  model, voice,
+  sourceLangNative, targetLangNative,
+  sourceLangCode, targetLangCode,
+  transcribeInput, transcriptionModel,
+  translationMode, vadPreset
+}) {
+  const turn_detection = buildTurnDetection(vadPreset)
+  const transcription = transcribeInput
+    ? {
+        model: transcriptionModel || 'gpt-realtime-whisper',
+        ...(sourceLangCode && sourceLangCode !== 'auto' ? { language: sourceLangCode } : {})
+      }
+    : null
+
+  if (isTranslateModel(model)) {
+    // Dedicated translation model: language is set explicitly, no prompt.
+    return {
+      type: 'realtime',
+      model,
+      output_language: targetLangCode,
+      output_modalities: ['audio'],
+      audio: {
+        input:  { transcription, turn_detection },
+        output: { voice }
+      }
+    }
+  }
+
+  // Generic gpt-realtime / gpt-4o-realtime: we steer it with a system prompt.
+  return {
+    type: 'realtime',
+    model,
+    output_modalities: ['audio'],
+    audio: {
+      input:  { transcription, turn_detection },
+      output: { voice }
+    },
+    instructions: buildTranslationInstructions({
+      sourceLang: sourceLangNative,
+      targetLang: targetLangNative,
+      mode: translationMode
+    })
+  }
+}
+
 export function useRealtimeTranslation(options) {
   const {
     apiKey, model, transcriptionModel, voice,
-    sourceLang, targetLang,
+    sourceLangNative, targetLangNative,
+    sourceLangCode, targetLangCode,
     deviceId, translationMode, vadPreset,
     autoPlayAudio, transcribeInput
   } = options
@@ -140,21 +195,13 @@ export function useRealtimeTranslation(options) {
 
     try {
       await client.connect({ deviceId })
-      client.updateSession({
-        output_modalities: ['audio'],
-        audio: {
-          input: {
-            transcription: transcribeInput
-              ? { model: transcriptionModel || 'gpt-realtime-whisper' }
-              : null,
-            turn_detection: buildTurnDetection(vadPreset)
-          },
-          output: { voice }
-        },
-        instructions: buildTranslationInstructions({
-          sourceLang, targetLang, mode: translationMode
-        })
-      })
+      client.updateSession(buildSessionConfig({
+        model, voice,
+        sourceLangNative, targetLangNative,
+        sourceLangCode, targetLangCode,
+        transcribeInput, transcriptionModel,
+        translationMode, vadPreset
+      }))
     } catch (err) {
       setError(err.message)
       setStatus('error')
@@ -162,7 +209,7 @@ export function useRealtimeTranslation(options) {
       clientRef.current = null
       setRemoteStream(null)
     }
-  }, [apiKey, model, transcriptionModel, voice, sourceLang, targetLang, deviceId, translationMode, vadPreset, transcribeInput, handleEvent])
+  }, [apiKey, model, transcriptionModel, voice, sourceLangNative, targetLangNative, sourceLangCode, targetLangCode, deviceId, translationMode, vadPreset, transcribeInput, handleEvent])
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -188,24 +235,18 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
+  // Live re-config while the session is open
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
-      clientRef.current.updateSession({
-        audio: {
-          input: {
-            transcription: transcribeInput
-              ? { model: transcriptionModel || 'gpt-realtime-whisper' }
-              : null,
-            turn_detection: buildTurnDetection(vadPreset)
-          },
-          output: { voice }
-        },
-        instructions: buildTranslationInstructions({
-          sourceLang, targetLang, mode: translationMode
-        })
-      })
+      clientRef.current.updateSession(buildSessionConfig({
+        model, voice,
+        sourceLangNative, targetLangNative,
+        sourceLangCode, targetLangCode,
+        transcribeInput, transcriptionModel,
+        translationMode, vadPreset
+      }))
     }
-  }, [sourceLang, targetLang, translationMode, voice, transcriptionModel, transcribeInput, vadPreset, status])
+  }, [sourceLangNative, targetLangNative, sourceLangCode, targetLangCode, translationMode, voice, transcriptionModel, transcribeInput, vadPreset, model, status])
 
   useEffect(() => () => {
     if (clientRef.current) clientRef.current.disconnect()

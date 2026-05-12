@@ -44,8 +44,10 @@ export default function App() {
     connect, disconnect, toggleMute, clearHistory
   } = useRealtimeTranslation({
     apiKey, model, transcriptionModel, voice,
-    sourceLang: sourceLanguage.native,
-    targetLang: targetLanguage.native,
+    sourceLangNative: sourceLanguage.native,
+    targetLangNative: targetLanguage.native,
+    sourceLangCode: sourceLanguage.code,
+    targetLangCode: targetLanguage.code,
     deviceId, translationMode, vadPreset,
     autoPlayAudio, transcribeInput
   })
