@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { LANGUAGES, getLanguage } from './utils/languages.js'
 import { useRealtimeTranslation } from './hooks/useRealtimeTranslation.js'
 import Header from './components/Header.jsx'
@@ -9,6 +9,9 @@ import TranscriptPanel from './components/TranscriptPanel.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import StatusBadge from './components/StatusBadge.jsx'
 import HistoryList from './components/HistoryList.jsx'
+
+// Lazy-loaded so the three.js bundle (~150KB gz) is fetched only when needed.
+const Avatar3D = lazy(() => import('./components/Avatar3D.jsx'))
 
 const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || 'gpt-realtime-translate'
 const DEFAULT_TRANSCRIPTION_MODEL = 'gpt-realtime-whisper'
@@ -29,13 +32,14 @@ export default function App() {
   const [translationMode, setTranslationMode] = useState(() => localStorage.getItem('rt_mode') || 'natural')
   const [vadPreset, setVadPreset]             = useState(() => localStorage.getItem('rt_vad') || 'balanced')
   const [showHistory, setShowHistory]         = useState(() => localStorage.getItem('rt_history') !== '0')
+  const [showAvatar, setShowAvatar]           = useState(() => localStorage.getItem('rt_avatar') !== '0')
 
   const sourceLanguage = useMemo(() => getLanguage(sourceLang), [sourceLang])
   const targetLanguage = useMemo(() => getLanguage(targetLang), [targetLang])
 
   const {
     status, error, isMuted,
-    sourceTranscript, translation, history, activity,
+    sourceTranscript, translation, history, activity, remoteStream,
     connect, disconnect, toggleMute, clearHistory
   } = useRealtimeTranslation({
     apiKey, model, transcriptionModel, voice,
@@ -57,6 +61,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('rt_mode', translationMode) }, [translationMode])
   useEffect(() => { localStorage.setItem('rt_vad', vadPreset) },        [vadPreset])
   useEffect(() => { localStorage.setItem('rt_history', showHistory ? '1' : '0') }, [showHistory])
+  useEffect(() => { localStorage.setItem('rt_avatar', showAvatar ? '1' : '0') }, [showAvatar])
 
   useEffect(() => {
     let cancelled = false
@@ -126,6 +131,17 @@ export default function App() {
             />
 
             <SpeedSelector value={vadPreset} onChange={setVadPreset} />
+
+            {showAvatar && (
+              <div className="d-flex justify-content-center mt-4">
+                <Suspense fallback={<div className="avatar-skeleton" />}>
+                  <Avatar3D
+                    stream={remoteStream}
+                    speaking={activity.assistant}
+                  />
+                </Suspense>
+              </div>
+            )}
 
             <div className="d-flex justify-content-center my-4">
               <MicButton
@@ -215,7 +231,7 @@ export default function App() {
 
         <footer className="text-center mt-5 mb-3 text-secondary small">
           <i className="bi bi-stars me-1"></i>
-          Powered by OpenAI Realtime API · Bootstrap 5 · React
+          Powered by OpenAI Realtime API · Bootstrap 5 · React · Three.js
         </footer>
       </main>
 
@@ -232,6 +248,7 @@ export default function App() {
         transcribeInput={transcribeInput} setTranscribeInput={setTranscribeInput}
         translationMode={translationMode} setTranslationMode={setTranslationMode}
         showHistory={showHistory} setShowHistory={setShowHistory}
+        showAvatar={showAvatar} setShowAvatar={setShowAvatar}
       />
     </div>
   )

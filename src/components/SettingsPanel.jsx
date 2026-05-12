@@ -12,7 +12,8 @@ export default function SettingsPanel({
   autoPlayAudio, setAutoPlayAudio,
   transcribeInput, setTranscribeInput,
   translationMode, setTranslationMode,
-  showHistory, setShowHistory
+  showHistory, setShowHistory,
+  showAvatar, setShowAvatar
 }) {
   const [showKey, setShowKey] = useState(false)
 
@@ -120,6 +121,14 @@ export default function SettingsPanel({
               </label>
             </div>
 
+            <div className="form-check form-switch mb-2">
+              <input className="form-check-input" type="checkbox" id="opt-avatar"
+                checked={showAvatar} onChange={e => setShowAvatar(e.target.checked)} />
+              <label className="form-check-label" htmlFor="opt-avatar">
+                <i className="bi bi-emoji-smile me-1"></i> Mostra avatar 3D parlante
+              </label>
+            </div>
+
             <div className="form-check form-switch mb-3">
               <input className="form-check-input" type="checkbox" id="opt-history"
                 checked={showHistory} onChange={e => setShowHistory(e.target.checked)} />
@@ -152,12 +161,11 @@ export default function SettingsPanel({
             <ul className="small text-secondary mb-0 ps-3">
               <li>Backend Node/Express per token effimeri (production-ready)</li>
               <li>Modalità conversazione bidirezionale (due voci alternate)</li>
+              <li>Avatar Ready Player Me con lip-sync a viseme</li>
               <li>Selettore di formalità (tu/Lei, formal/informal)</li>
               <li>Esportazione MP3/WAV della traduzione</li>
-              <li>PWA installabile + tema scuro automatico</li>
               <li>Glossario di nomi propri / acronimi mantenuti invariati</li>
               <li>Sottotitoli sincronizzati word-by-word (delta evidenziati)</li>
-              <li>Salvataggio cronologia su file JSON o cloud</li>
             </ul>
           </section>
         </div>

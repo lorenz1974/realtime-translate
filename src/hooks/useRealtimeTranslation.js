@@ -28,6 +28,7 @@ export function useRealtimeTranslation(options) {
   const [translation, setTranslation] = useState('')
   const [history, setHistory] = useState([])
   const [activity, setActivity] = useState({ user: false, assistant: false })
+  const [remoteStream, setRemoteStream] = useState(null)
 
   const clientRef = useRef(null)
   const audioElRef = useRef(null)
@@ -129,6 +130,7 @@ export function useRealtimeTranslation(options) {
           audioElRef.current.srcObject = stream
           audioElRef.current.play?.().catch(() => {})
         }
+        setRemoteStream(stream)
       },
       onError: (err) => setError(err.message)
     })
@@ -156,6 +158,7 @@ export function useRealtimeTranslation(options) {
       setStatus('error')
       client.disconnect()
       clientRef.current = null
+      setRemoteStream(null)
     }
   }, [apiKey, model, transcriptionModel, voice, sourceLang, targetLang, deviceId, translationMode, vadPreset, transcribeInput, handleEvent])
 
@@ -166,6 +169,7 @@ export function useRealtimeTranslation(options) {
     }
     setStatus('disconnected')
     setActivity({ user: false, assistant: false })
+    setRemoteStream(null)
   }, [])
 
   const toggleMute = useCallback(() => {
@@ -182,7 +186,7 @@ export function useRealtimeTranslation(options) {
     setTranslation('')
   }, [])
 
-  // Aggiorna istruzioni / voce / trascrizione / VAD mentre la sessione è attiva
+  // Aggiorna istruzioni / voce / trascrizione / VAD durante la sessione attiva
   useEffect(() => {
     if (status === 'connected' && clientRef.current) {
       clientRef.current.updateSession({
@@ -209,6 +213,7 @@ export function useRealtimeTranslation(options) {
   return {
     status, error, isMuted,
     sourceTranscript, translation, history, activity,
+    remoteStream,
     connect, disconnect, toggleMute, clearHistory
   }
 }
