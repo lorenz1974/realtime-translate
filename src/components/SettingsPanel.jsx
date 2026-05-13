@@ -51,38 +51,42 @@ export default function SettingsPanel({
               <i className='bi bi-key-fill me-1 text-warning'></i>Connessione
             </h6>
 
-            <label className='form-label small'>Chiave API OpenAI</label>
-            <div className='input-group mb-2'>
-              <input
-                type={showKey ? 'text' : 'password'}
-                className='form-control'
-                placeholder='sk-…'
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                autoComplete='off'
-                spellCheck='false'
-              />
-              <button
-                className='btn btn-outline-secondary'
-                type='button'
-                onClick={() => setShowKey((s) => !s)}
-                aria-label={showKey ? 'Nascondi chiave' : 'Mostra chiave'}
-              >
-                <i className={`bi ${showKey ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-              </button>
-            </div>
-            {apiKeyFromEnv && (
+            {apiKeyFromEnv ? (
               <div className='small text-success mb-2'>
                 <i className='bi bi-check-circle-fill me-1'></i>
-                Chiave pre-configurata dall'ambiente di build. Puoi
-                sovrascriverla qui se necessario.
+                Chiave API configurata tramite variabile d'ambiente di build.
               </div>
+            ) : (
+              <>
+                <label className='form-label small'>Chiave API OpenAI</label>
+                <div className='input-group mb-2'>
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    className='form-control'
+                    placeholder='sk-…'
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    autoComplete='off'
+                    spellCheck='false'
+                  />
+                  <button
+                    className='btn btn-outline-secondary'
+                    type='button'
+                    onClick={() => setShowKey((s) => !s)}
+                    aria-label={showKey ? 'Nascondi chiave' : 'Mostra chiave'}
+                  >
+                    <i
+                      className={`bi ${showKey ? 'bi-eye-slash' : 'bi-eye'}`}
+                    ></i>
+                  </button>
+                </div>
+                <div className='small text-secondary mb-2'>
+                  <i className='bi bi-shield-lock me-1'></i>
+                  Resta nel tuo browser (localStorage). Per la produzione usa un
+                  backend che generi token effimeri.
+                </div>
+              </>
             )}
-            <div className='small text-secondary mb-2'>
-              <i className='bi bi-shield-lock me-1'></i>
-              Resta nel tuo browser (localStorage). Per la produzione usa un
-              backend che generi token effimeri.
-            </div>
             <div className='small text-secondary'>
               <i className='bi bi-cpu me-1'></i>
               Motore: <code>gpt-realtime-translate</code> · trascrizione:{' '}
