@@ -26,12 +26,14 @@ export function useRealtimeTranslation(options) {
   const [history, setHistory] = useState([])
   const [activity, setActivity] = useState({ user: false, assistant: false })
 
-  const clientRef         = useRef(null)
-  const audioElRef        = useRef(null)
-  const currentSourceRef  = useRef('')
+  const clientRef = useRef(null)
+  const audioElRef = useRef(null)
+  const currentSourceRef = useRef('')
+  const committedSourceRef = useRef('')
   const currentTranslationRef = useRef('')
-  const sourceCodeRef     = useRef(sourceCode)
-  const targetCodeRef     = useRef(targetCode)
+  const committedTranslationRef = useRef('')
+  const sourceCodeRef = useRef(sourceCode)
+  const targetCodeRef = useRef(targetCode)
 
   useEffect(() => { sourceCodeRef.current = sourceCode }, [sourceCode])
   useEffect(() => { targetCodeRef.current = targetCode }, [targetCode])
@@ -47,16 +49,20 @@ export function useRealtimeTranslation(options) {
   }, [])
 
   const commitToHistory = useCallback(() => {
-    if (currentSourceRef.current || currentTranslationRef.current) {
+    const source = committedSourceRef.current || currentSourceRef.current
+    const transl = committedTranslationRef.current || currentTranslationRef.current
+    if (source || transl) {
       const entry = {
         id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
         sourceCode: sourceCodeRef.current,
         targetCode: targetCodeRef.current,
-        source: currentSourceRef.current,
-        translation: currentTranslationRef.current,
+        source,
+        translation: transl,
         ts: Date.now()
       }
       setHistory(h => [entry, ...h].slice(0, 50))
+      committedSourceRef.current = ''
+      committedTranslationRef.current = ''
       currentSourceRef.current = ''
       currentTranslationRef.current = ''
       setSourceTranscript('')
@@ -68,32 +74,40 @@ export function useRealtimeTranslation(options) {
     switch (event.type) {
       case 'session.input_transcript.delta':
         currentSourceRef.current += event.delta || ''
-        setSourceTranscript(currentSourceRef.current)
+        setSourceTranscript(committedSourceRef.current + currentSourceRef.current)
         setActivity(a => ({ ...a, user: true }))
         break
       case 'session.input_transcript.done':
-      case 'session.input_transcript.completed':
-        if (event.transcript) {
-          currentSourceRef.current = event.transcript
-          setSourceTranscript(currentSourceRef.current)
+      case 'session.input_transcript.completed': {
+        const seg = event.transcript || currentSourceRef.current
+        if (seg) {
+          committedSourceRef.current = committedSourceRef.current
+            ? committedSourceRef.current + ' ' + seg
+            : seg
         }
+        currentSourceRef.current = ''
+        setSourceTranscript(committedSourceRef.current)
         setActivity(a => ({ ...a, user: false }))
         break
+      }
       case 'session.output_transcript.delta':
         currentTranslationRef.current += event.delta || ''
-        setTranslation(currentTranslationRef.current)
+        setTranslation(committedTranslationRef.current + currentTranslationRef.current)
         setActivity(a => ({ ...a, assistant: true }))
         break
       case 'session.output_transcript.done':
-      case 'session.output_transcript.completed':
-        if (event.transcript) {
-          currentTranslationRef.current = event.transcript
-          setTranslation(currentTranslationRef.current)
+      case 'session.output_transcript.completed': {
+        const seg = event.transcript || currentTranslationRef.current
+        if (seg) {
+          committedTranslationRef.current = committedTranslationRef.current
+            ? committedTranslationRef.current + ' ' + seg
+            : seg
         }
+        currentTranslationRef.current = ''
+        setTranslation(committedTranslationRef.current)
         setActivity(a => ({ ...a, assistant: false }))
-        // History commits on swap or disconnect, not here, so the panels
-        // keep accumulating until the user takes a turn.
         break
+      }
       case 'error':
         setError(event.error?.message || 'Errore sconosciuto dalla Realtime API')
         break
@@ -116,7 +130,7 @@ export function useRealtimeTranslation(options) {
       onTrack: (stream) => {
         if (audioElRef.current) {
           audioElRef.current.srcObject = stream
-          audioElRef.current.play?.().catch(() => {})
+          audioElRef.current.play?.().catch(() => { })
         }
       },
       onError: (err) => setError(err.message)
